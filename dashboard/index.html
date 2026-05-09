@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Singularity Engine | Mesa Operacional</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: rgba(20, 25, 40, 0.6);
+            --accent-blue: #00f0ff;
+            --accent-green: #00ff88;
+            --accent-red: #ff3366;
+            --accent-purple: #b000ff;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(0, 240, 255, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 255, 136, 0.05), transparent 25%);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 1rem;
+        }
+
+        .title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .status-badge {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--accent-green);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            box-shadow: 0 0 10px rgba(0,255,136,0.1);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.2); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 1.5rem;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel h2 {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #network {
+            width: 100%;
+            height: 400px;
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid rgba(255,255,255,0.03);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255,255,255,0.1);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0.5rem 0;
+        }
+
+        .table-wrapper {
+            flex-grow: 1;
+            overflow-y: auto;
+            max-height: 450px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9rem;
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+        }
+
+        tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .signal-LONG { color: var(--accent-green); font-weight: bold; }
+        .signal-SHORT { color: var(--accent-red); font-weight: bold; }
+        .signal-NEUTRAL { color: var(--text-muted); }
+
+        .status-APPROVED_BY_COMMITTEE { color: var(--accent-green); }
+        .status-REJECTED_BY_GUARDIAN { color: var(--accent-red); opacity: 0.7; }
+        .status-UNKNOWN { color: var(--text-muted); }
+        
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: var(--accent-blue);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title">NEXUS MCP SWARM | MESA OPERACIONAL V13</div>
+        <div class="status-badge">● MCP SERVER ONLINE</div>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem">Eventos Analisados</div>
+            <div class="stat-value" id="totalEvents">0</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem">Taxa de Rejeição (Guardian)</div>
+            <div class="stat-value" id="rejectionRate" style="color: var(--accent-red)">0%</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem">Ordens Físicas Enviadas (MCP)</div>
+            <div class="stat-value" id="approvedOrders" style="color: var(--accent-green)">0</div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="panel">
+            <h2>Swarm Topology (Agentes Ativos)</h2>
+            <div id="network"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Fluxo de Memória SQLite (Real-Time)</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Horário</th>
+                            <th>Ativo</th>
+                            <th>Sinal</th>
+                            <th>Convicção</th>
+                            <th>Veredito</th>
+                        </tr>
+                    </thead>
+                    <tbody id="telemetryBody">
+                        <!-- Data injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // VisJS Network Setup
+        let network = null;
+        async function initNetwork() {
+            try {
+                const res = await fetch('/api/network');
+                const data = await res.json();
+                
+                const container = document.getElementById('network');
+                const nodes = new vis.DataSet(data.nodes);
+                const edges = new vis.DataSet(data.edges);
+                
+                const options = {
+                    nodes: {
+                        shape: 'dot',
+                        size: 20,
+                        font: { color: '#e2e8f0', size: 12 },
+                        borderWidth: 2,
+                        shadow: true
+                    },
+                    edges: {
+                        width: 2,
+                        color: { color: 'rgba(0, 240, 255, 0.3)', highlight: '#00f0ff' },
+                        smooth: { type: 'continuous' }
+                    },
+                    groups: {
+                        ingestion: { color: { background: '#2B7CE9', border: '#1B5CB9' } },
+                        analysis: { color: { background: '#97C2FC', border: '#2B7CE9' } },
+                        brain: { color: { background: '#b000ff', border: '#7000a8' } },
+                        risk: { color: { background: '#ff3366', border: '#b30033' } },
+                        security: { color: { background: '#FFA500', border: '#CC8400' } },
+                        consensus: { color: { background: '#00ff88', border: '#00cc6a' } },
+                        mcp: { color: { background: '#FFFFFF', border: '#CCCCCC' } },
+                        memory: { color: { background: '#64748b', border: '#475569' } }
+                    },
+                    physics: {
+                        barnesHut: { gravitationalConstant: -2000, centralGravity: 0.3, springLength: 95 }
+                    }
+                };
+                network = new vis.Network(container, {nodes, edges}, options);
+            } catch(e) {
+                console.error("Erro na Topologia", e);
+            }
+        }
+
+        async function fetchTelemetry() {
+            try {
+                const response = await fetch('/api/telemetry');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    updateDashboard(result.data);
+                }
+            } catch (error) {
+                console.error("Erro ao buscar dados:", error);
+            }
+        }
+
+        function updateDashboard(data) {
+            const tbody = document.getElementById('telemetryBody');
+            tbody.innerHTML = '';
+            
+            let total = data.length;
+            let rejected = 0;
+            let approved = 0;
+
+            data.forEach(row => {
+                if(row.status === "REJECTED_BY_GUARDIAN") rejected++;
+                if(row.status === "APPROVED_BY_COMMITTEE" || row.status === "EXECUTED_IN_BROKER") approved++;
+
+                const tr = document.createElement('tr');
+                
+                const date = new Date(row.timestamp + 'Z');
+                const timeStr = date.toLocaleTimeString('pt-BR', { hour12: false });
+                
+                const confPercent = Math.min((row.confidence || 0) * 100, 100);
+                const confColor = confPercent > 85 ? 'var(--accent-green)' : (confPercent > 50 ? 'var(--accent-blue)' : 'var(--text-muted)');
+                
+                const signalClass = `signal-${row.signal}`;
+                const statusClass = `status-${row.status}`;
+
+                tr.innerHTML = `
+                    <td style="color: var(--text-muted)">${timeStr}</td>
+                    <td style="font-weight: bold">${row.asset}</td>
+                    <td class="${signalClass}">${row.signal}</td>
+                    <td>
+                        <div style="font-size: 0.85rem; color: var(--text-muted)">${(row.confidence || 0).toFixed(2)}</div>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${confPercent}%; background: ${confColor}"></div>
+                        </div>
+                    </td>
+                    <td class="${statusClass}">${row.status.replace(/_/g, ' ')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('totalEvents').innerText = total;
+            document.getElementById('approvedOrders').innerText = approved;
+            
+            const rejRate = total > 0 ? ((rejected / total) * 100).toFixed(1) : 0;
+            document.getElementById('rejectionRate').innerText = `${rejRate}%`;
+        }
+
+        initNetwork();
+        setInterval(fetchTelemetry, 2000);
+        fetchTelemetry();
+    </script>
+</body>
+</html>
+</body>
+</html>

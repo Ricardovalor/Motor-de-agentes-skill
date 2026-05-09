@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  nexus_engine:
+    build: .
+    container_name: nexus_singularity_engine_v10
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./memory_data:/app/memory_data
+      - ./agents:/app/agents
+      - ./skills:/app/skills
+      - ./core:/app/core
+      - ./main.py:/app/main.py
+    ports:
+      - "8005:8000"
+    networks:
+      - nexus_net
+
+  nexus_dashboard:
+    build: .
+    container_name: nexus_operational_dashboard
+    restart: always
+    volumes:
+      - ./memory_data:/app/memory_data
+      - ./dashboard:/app/dashboard
+    ports:
+      - "3030:3030"
+    command: python dashboard/server.py
+    networks:
+      - nexus_net
+
+networks:
+  nexus_net:
+    driver: bridge
