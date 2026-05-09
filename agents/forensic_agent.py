@@ -50,7 +50,7 @@ class ForensicAgent(BaseAgent):
         )
         
         # Envia para a nuvem no Supabase para Data Lake e integrações Web
-        self.supabase_db.log_execution(
+        self.supabase_db.log_pipeline_execution(
             asset=asset,
             signal=signal,
             confidence=confidence,
