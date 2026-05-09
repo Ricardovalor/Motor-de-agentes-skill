@@ -13,8 +13,6 @@ class QuantumRiskAgent(BaseAgent):
         await super().initialize()
         # Escuta o Tape Reader (só processa se o fluxo L2 confirmar a operação)
         self.bus.subscribe("order_flow_cleared", self)
-        # Mantém escuta temporal caso a arquitetura exija
-        self.bus.subscribe("temporal_insight_generated", self)
 
     async def handle_message(self, message: Message):
         insight = message.payload

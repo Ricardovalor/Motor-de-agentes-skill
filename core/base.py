@@ -7,8 +7,9 @@ class BaseSkill(ABC):
     """
     Habilidade Genérica que pode ser acoplada a qualquer agente.
     """
-    def __init__(self, name: str):
+    def __init__(self, name: str, description: str = None):
         self.name = name
+        self.description = description
         self.logger = logging.getLogger(f"Skill_{name}")
 
     @abstractmethod

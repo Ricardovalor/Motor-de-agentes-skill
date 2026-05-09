@@ -9,6 +9,7 @@ services:
       - .env
     volumes:
       - ./memory_data:/app/memory_data
+      - ./memory:/app/memory
       - ./agents:/app/agents
       - ./skills:/app/skills
       - ./core:/app/core
