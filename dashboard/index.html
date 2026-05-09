@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Singularity Engine | Mesa Operacional</title>
+    <title>Nexus Singularity Engine | Mesa Operacional V16.1</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --panel-bg: rgba(20, 25, 40, 0.6);
-            --accent-blue: #00f0ff;
+            --bg-color: #050810;
+            --panel-bg: rgba(15, 20, 35, 0.7);
+            --accent-blue: #00e5ff;
             --accent-green: #00ff88;
-            --accent-red: #ff3366;
-            --accent-purple: #b000ff;
-            --text-main: #e2e8f0;
-            --text-muted: #64748b;
+            --accent-red: #ff2a55;
+            --accent-purple: #9d00ff;
+            --accent-orange: #ff9900;
+            --text-main: #f8fafc;
+            --text-muted: #8b9bb4;
         }
 
         body {
@@ -22,11 +23,11 @@
             color: var(--text-main);
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             margin: 0;
-            padding: 2rem;
+            padding: 1.5rem 2rem;
             min-height: 100vh;
             background-image: 
-                radial-gradient(circle at 15% 50%, rgba(0, 240, 255, 0.05), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(0, 255, 136, 0.05), transparent 25%);
+                radial-gradient(circle at 10% 40%, rgba(0, 229, 255, 0.03), transparent 30%),
+                radial-gradient(circle at 90% 60%, rgba(157, 0, 255, 0.04), transparent 30%);
         }
 
         .header {
@@ -39,24 +40,24 @@
         }
 
         .title {
-            font-size: 1.5rem;
-            font-weight: 700;
+            font-size: 1.6rem;
+            font-weight: 800;
             background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
             text-transform: uppercase;
         }
 
         .status-badge {
             background: rgba(0, 255, 136, 0.1);
             color: var(--accent-green);
-            padding: 0.5rem 1rem;
+            padding: 0.5rem 1.2rem;
             border-radius: 20px;
             font-size: 0.85rem;
-            font-weight: 600;
+            font-weight: 700;
             border: 1px solid rgba(0, 255, 136, 0.2);
-            box-shadow: 0 0 10px rgba(0,255,136,0.1);
+            box-shadow: 0 0 15px rgba(0,255,136,0.1);
             animation: pulse 2s infinite;
         }
 
@@ -66,71 +67,92 @@
             100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            padding: 1.2rem;
+            border: 1px solid rgba(255,255,255,0.03);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, var(--accent-blue), transparent);
+            opacity: 0.5;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255,255,255,0.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--text-main);
+            margin: 0.5rem 0 0 0;
+        }
+
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 1fr 2fr;
+            grid-template-columns: 1fr 2.5fr;
             gap: 1.5rem;
         }
 
         .panel {
             background: var(--panel-bg);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(12px);
             border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.06);
             padding: 1.5rem;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
             display: flex;
             flex-direction: column;
         }
 
         .panel h2 {
-            font-size: 1rem;
-            color: var(--text-muted);
+            font-size: 1.1rem;
+            color: var(--accent-blue);
             margin-top: 0;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.2rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
+            font-weight: 600;
         }
 
         #network {
             width: 100%;
-            height: 400px;
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 8px;
-            background: rgba(0,0,0,0.2);
-        }
-
-        .stats-row {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .stat-card {
-            flex: 1;
-            background: rgba(255,255,255,0.02);
-            border-radius: 12px;
-            padding: 1rem;
+            height: 480px;
             border: 1px solid rgba(255,255,255,0.03);
-            transition: transform 0.2s;
-        }
-        .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: rgba(255,255,255,0.1);
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-main);
-            margin: 0.5rem 0;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
         }
 
         .table-wrapper {
             flex-grow: 1;
             overflow-y: auto;
-            max-height: 450px;
+            max-height: 480px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.03);
+            background: rgba(0,0,0,0.2);
         }
+
+        .table-wrapper::-webkit-scrollbar { width: 6px; }
+        .table-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .table-wrapper::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
 
         table {
             width: 100%;
@@ -138,90 +160,115 @@
         }
 
         th, td {
-            padding: 0.75rem 1rem;
+            padding: 0.8rem 1rem;
             text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.85rem;
         }
 
         th {
             color: var(--text-muted);
-            font-weight: 600;
-            font-size: 0.8rem;
+            font-weight: 700;
+            font-size: 0.75rem;
             text-transform: uppercase;
+            letter-spacing: 1px;
             position: sticky;
             top: 0;
-            background: var(--panel-bg);
-            backdrop-filter: blur(10px);
+            background: #111624;
+            z-index: 10;
         }
 
         tr:hover td {
-            background: rgba(255,255,255,0.02);
+            background: rgba(255,255,255,0.03);
         }
 
-        .signal-LONG { color: var(--accent-green); font-weight: bold; }
-        .signal-SHORT { color: var(--accent-red); font-weight: bold; }
-        .signal-NEUTRAL { color: var(--text-muted); }
+        /* Signal Colors */
+        .badge {
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-LONG { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); border: 1px solid rgba(0,255,136,0.3); }
+        .badge-SHORT { background: rgba(255, 42, 85, 0.15); color: var(--accent-red); border: 1px solid rgba(255,42,85,0.3); }
+        .badge-NEUTRAL { background: rgba(139, 155, 180, 0.15); color: var(--text-muted); border: 1px solid rgba(139,155,180,0.3); }
+        .badge-UNKNOWN { background: rgba(255, 153, 0, 0.15); color: var(--accent-orange); border: 1px solid rgba(255,153,0,0.3); }
 
-        .status-APPROVED_BY_COMMITTEE { color: var(--accent-green); }
-        .status-REJECTED_BY_GUARDIAN { color: var(--accent-red); opacity: 0.7; }
+        .status-APPROVED_BY_COMMITTEE { color: var(--accent-green); font-weight: 600;}
+        .status-REJECTED_BY_GUARDIAN { color: var(--accent-red); font-weight: 600;}
+        .status-REJECTED_BY_WATCHDOG { color: var(--accent-orange); font-weight: 600;}
         .status-UNKNOWN { color: var(--text-muted); }
         
         .progress-container {
             width: 100%;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
+            height: 5px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 3px;
             overflow: hidden;
-            margin-top: 0.25rem;
+            margin-top: 0.4rem;
         }
         
         .progress-bar {
             height: 100%;
-            background: var(--accent-blue);
-            transition: width 0.3s ease;
+            transition: width 0.4s ease;
         }
+
+        .data-cell { display: flex; flex-direction: column; gap: 4px; }
+        .data-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+        .data-value { font-size: 0.85rem; font-weight: 500; }
+        
+        .fvg-text { font-size: 0.75rem; opacity: 0.8; margin-top: 2px;}
+
     </style>
 </head>
 <body>
 
     <div class="header">
-        <div class="title">NEXUS MCP SWARM | MESA OPERACIONAL V13</div>
-        <div class="status-badge">● MCP SERVER ONLINE</div>
+        <div class="title">NEXUS MCP SWARM | MESA OPERACIONAL V16.1</div>
+        <div class="status-badge">● INFRAESTRUTURA HFT ONLINE</div>
     </div>
 
     <div class="stats-row">
         <div class="stat-card">
-            <div style="color: var(--text-muted); font-size: 0.85rem">Eventos Analisados</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Sinais Avaliados (L1)</div>
             <div class="stat-value" id="totalEvents">0</div>
         </div>
         <div class="stat-card">
-            <div style="color: var(--text-muted); font-size: 0.85rem">Taxa de Rejeição (Guardian)</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Rejeições HFT / Risco</div>
             <div class="stat-value" id="rejectionRate" style="color: var(--accent-red)">0%</div>
         </div>
         <div class="stat-card">
-            <div style="color: var(--text-muted); font-size: 0.85rem">Ordens Físicas Enviadas (MCP)</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Veredito Positivo (L2)</div>
             <div class="stat-value" id="approvedOrders" style="color: var(--accent-green)">0</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Supabase Cloud Sync</div>
+            <div class="stat-value" id="cloudSyncStatus" style="color: var(--accent-blue)">Ativo</div>
         </div>
     </div>
 
     <div class="dashboard-grid">
         <div class="panel">
-            <h2>Swarm Topology (Agentes Ativos)</h2>
+            <h2>Swarm Topology V16.1</h2>
             <div id="network"></div>
         </div>
 
         <div class="panel">
-            <h2>Fluxo de Memória SQLite (Real-Time)</h2>
+            <h2>Fluxo de Liquidez Institucional (Tape Reading & Macro)</h2>
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
-                            <th>Horário</th>
-                            <th>Ativo</th>
-                            <th>Sinal</th>
-                            <th>Convicção</th>
-                            <th>Veredito</th>
+                            <th width="10%">Horário</th>
+                            <th width="8%">Ativo</th>
+                            <th width="10%">Sinal Oracle</th>
+                            <th width="18%">Bias Estrutural (SMC)</th>
+                            <th width="18%">Fluxo (Tape L2)</th>
+                            <th width="15%">Convicção (AI)</th>
+                            <th width="21%">Status Guardião</th>
                         </tr>
                     </thead>
                     <tbody id="telemetryBody">
@@ -247,28 +294,30 @@
                 const options = {
                     nodes: {
                         shape: 'dot',
-                        size: 20,
-                        font: { color: '#e2e8f0', size: 12 },
+                        size: 18,
+                        font: { color: '#f8fafc', size: 11, face: 'Inter' },
                         borderWidth: 2,
-                        shadow: true
+                        shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10 }
                     },
                     edges: {
-                        width: 2,
-                        color: { color: 'rgba(0, 240, 255, 0.3)', highlight: '#00f0ff' },
-                        smooth: { type: 'continuous' }
+                        width: 1.5,
+                        color: { color: 'rgba(0, 229, 255, 0.2)', highlight: '#00e5ff' },
+                        smooth: { type: 'curvedCW', roundness: 0.2 },
+                        arrows: { to: { enabled: true, scaleFactor: 0.5 } }
                     },
                     groups: {
-                        ingestion: { color: { background: '#2B7CE9', border: '#1B5CB9' } },
-                        analysis: { color: { background: '#97C2FC', border: '#2B7CE9' } },
-                        brain: { color: { background: '#b000ff', border: '#7000a8' } },
-                        risk: { color: { background: '#ff3366', border: '#b30033' } },
-                        security: { color: { background: '#FFA500', border: '#CC8400' } },
-                        consensus: { color: { background: '#00ff88', border: '#00cc6a' } },
-                        mcp: { color: { background: '#FFFFFF', border: '#CCCCCC' } },
-                        memory: { color: { background: '#64748b', border: '#475569' } }
+                        ingestion: { color: { background: '#1d4ed8', border: '#2563eb' } },
+                        analysis: { color: { background: '#0ea5e9', border: '#38bdf8' } },
+                        brain: { color: { background: '#8b5cf6', border: '#a78bfa' } },
+                        risk: { color: { background: '#e11d48', border: '#fb7185' } },
+                        security: { color: { background: '#ea580c', border: '#fb923c' } },
+                        consensus: { color: { background: '#10b981', border: '#34d399' } },
+                        mcp: { color: { background: '#f1f5f9', border: '#ffffff' } },
+                        memory: { color: { background: '#475569', border: '#64748b' } }
                     },
                     physics: {
-                        barnesHut: { gravitationalConstant: -2000, centralGravity: 0.3, springLength: 95 }
+                        barnesHut: { gravitationalConstant: -3000, centralGravity: 0.4, springLength: 120 },
+                        solver: 'barnesHut'
                     }
                 };
                 network = new vis.Network(container, {nodes, edges}, options);
@@ -287,6 +336,8 @@
                 }
             } catch (error) {
                 console.error("Erro ao buscar dados:", error);
+                document.getElementById('cloudSyncStatus').innerText = "Offline";
+                document.getElementById('cloudSyncStatus').style.color = "var(--accent-red)";
             }
         }
 
@@ -299,7 +350,7 @@
             let approved = 0;
 
             data.forEach(row => {
-                if(row.status === "REJECTED_BY_GUARDIAN") rejected++;
+                if(row.status && row.status.includes("REJECTED")) rejected++;
                 if(row.status === "APPROVED_BY_COMMITTEE" || row.status === "EXECUTED_IN_BROKER") approved++;
 
                 const tr = document.createElement('tr');
@@ -308,22 +359,49 @@
                 const timeStr = date.toLocaleTimeString('pt-BR', { hour12: false });
                 
                 const confPercent = Math.min((row.confidence || 0) * 100, 100);
-                const confColor = confPercent > 85 ? 'var(--accent-green)' : (confPercent > 50 ? 'var(--accent-blue)' : 'var(--text-muted)');
+                const confColor = confPercent > 85 ? 'var(--accent-green)' : (confPercent > 50 ? 'var(--accent-blue)' : 'var(--accent-red)');
                 
-                const signalClass = `signal-${row.signal}`;
-                const statusClass = `status-${row.status}`;
+                let raw = {};
+                try {
+                    raw = JSON.parse(row.raw_data || '{}');
+                } catch(e) {}
+
+                // Parse advanced fields from raw_data
+                const smcBias = raw.smc_bias || 'N/A';
+                const fvg = raw.fvg_detected ? raw.fvg_type : 'Sem FVG';
+                const tapeBias = raw.tape_bias || 'N/A';
+                
+                let smcColor = smcBias.includes('BULL') ? 'var(--accent-green)' : (smcBias.includes('BEAR') ? 'var(--accent-red)' : 'var(--text-muted)');
+                let tapeColor = tapeBias.includes('BULL') ? 'var(--accent-green)' : (tapeBias.includes('BEAR') ? 'var(--accent-red)' : 'var(--text-muted)');
 
                 tr.innerHTML = `
-                    <td style="color: var(--text-muted)">${timeStr}</td>
-                    <td style="font-weight: bold">${row.asset}</td>
-                    <td class="${signalClass}">${row.signal}</td>
+                    <td style="color: var(--text-muted); font-family: monospace;">${timeStr}</td>
+                    <td style="font-weight: 800; color: #fff;">${row.asset}</td>
+                    <td><span class="badge badge-${row.signal}">${row.signal}</span></td>
+                    
+                    <td class="data-cell">
+                        <span class="data-value" style="color: ${smcColor}">${smcBias}</span>
+                        <span class="fvg-text">${fvg}</span>
+                    </td>
+                    
+                    <td class="data-cell">
+                        <span class="data-value" style="color: ${tapeColor}">${tapeBias.replace('_', ' ')}</span>
+                    </td>
+
                     <td>
-                        <div style="font-size: 0.85rem; color: var(--text-muted)">${(row.confidence || 0).toFixed(2)}</div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                            <span style="font-size: 0.85rem; color: var(--text-main)">${(row.confidence || 0).toFixed(2)}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted)">${confPercent.toFixed(0)}%</span>
+                        </div>
                         <div class="progress-container">
-                            <div class="progress-bar" style="width: ${confPercent}%; background: ${confColor}"></div>
+                            <div class="progress-bar" style="width: ${confPercent}%; background: ${confColor}; box-shadow: 0 0 10px ${confColor}"></div>
                         </div>
                     </td>
-                    <td class="${statusClass}">${row.status.replace(/_/g, ' ')}</td>
+                    
+                    <td class="status-${row.status} data-cell">
+                        <span style="font-size:0.8rem">${row.status.replace(/_/g, ' ')}</span>
+                        ${raw.cognitive_override ? `<span style="font-size:0.65rem; color:var(--text-muted); font-style:italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${raw.cognitive_override}">${raw.cognitive_override}</span>` : ''}
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -339,7 +417,5 @@
         setInterval(fetchTelemetry, 2000);
         fetchTelemetry();
     </script>
-</body>
-</html>
 </body>
 </html>

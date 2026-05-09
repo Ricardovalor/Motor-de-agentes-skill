@@ -51,20 +51,24 @@ def get_network_nodes():
     # Retorna a topologia do Swarm para o Visualizador MCP
     nodes = [
         {"id": 1, "label": "Data-Ops", "group": "ingestion", "title": "MarketDataFetchSkill"},
+        {"id": 9, "label": "Macro-Geopolítica", "group": "analysis", "title": "MacroNewsSkill"},
         {"id": 2, "label": "Temporal-Chronos", "group": "analysis", "title": "FractalPatternSkill"},
-        {"id": 3, "label": "Oracle-Prime", "group": "brain", "title": "GeminiInferenceSkill"},
+        {"id": 3, "label": "Oracle-Prime", "group": "brain", "title": "Gemini + SMC + Quant"},
+        {"id": 10, "label": "DevOps-Watchdog", "group": "security", "title": "KillSwitch / Ping / RAM"},
+        {"id": 11, "label": "TapeReader-Flow", "group": "analysis", "title": "DOM L2 / Order Flow"},
         {"id": 4, "label": "Quantum-Risk", "group": "risk", "title": "MonteCarlo"},
         {"id": 5, "label": "Guardian-Protocol", "group": "security", "title": "Apex Compliance"},
-        {"id": 6, "label": "Committee-Council", "group": "consensus", "title": "Final Verdict"},
+        {"id": 6, "label": "Committee-Council", "group": "consensus", "title": "Final Verdict + RL"},
         {"id": 7, "label": "Broker-Execution", "group": "mcp", "title": "CDP/Port 9222"},
-        {"id": 8, "label": "Forensic-Audit", "group": "memory", "title": "ChromaDB / SQLite"}
+        {"id": 8, "label": "Forensic-Audit", "group": "memory", "title": "ChromaDB / Supabase"}
     ]
     edges = [
-        {"from": 1, "to": 2}, {"from": 1, "to": 3},
-        {"from": 2, "to": 6}, {"from": 3, "to": 4},
+        {"from": 1, "to": 9}, {"from": 1, "to": 2},
+        {"from": 9, "to": 3}, {"from": 3, "to": 10},
+        {"from": 10, "to": 11}, {"from": 11, "to": 4},
         {"from": 4, "to": 5}, {"from": 5, "to": 6},
-        {"from": 6, "to": 7}, {"from": 7, "to": 8},
-        {"from": 6, "to": 8}
+        {"from": 2, "to": 6}, {"from": 6, "to": 7},
+        {"from": 6, "to": 8}, {"from": 7, "to": 8}
     ]
     return {"nodes": nodes, "edges": edges}
 
