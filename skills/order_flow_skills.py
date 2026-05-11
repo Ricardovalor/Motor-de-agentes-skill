@@ -1,7 +1,6 @@
 import logging
 from typing import Dict, Any
 from core.base import BaseSkill
-import random
 
 logger = logging.getLogger("OrderFlow")
 
@@ -9,6 +8,7 @@ class LiquidityHeatmapSkill(BaseSkill):
     """
     Skill que lê o DOM (Depth of Market) Nível 2.
     Procura por anomalias de liquidez, como Spoofing ou Absorção Institucional.
+    Usa dados reais do MarketDepthL2Skill (CDP) quando disponíveis.
     """
     def __init__(self):
         super().__init__(name="LiquidityHeatmapSkill", description="Análise de Fluxo (Tape Reading) Nível 2")
@@ -19,28 +19,43 @@ class LiquidityHeatmapSkill(BaseSkill):
         
         logger.info(f"Escaneando Orderbook L2 (Tape Reading) para confirmar o fluxo direcional de {asset}...")
         
-        # Simulação de Leitura de Fita (Tape Reading)
-        # Se for LONG, queremos ver absorção forte de contratos de venda pelos compradores (Big Bids)
-        # Se for SHORT, queremos ver absorção forte de contratos de compra pelos vendedores (Big Asks)
-        
+        # Tenta ler dados reais do DOM via CDP
         tape_bias = "NEUTRAL"
         institutional_absorption = False
-        
-        # Randomizamos a absorção para simular o DOM instável, 
-        # mas na maioria das vezes a fita está confusa (NEUTRAL).
-        # Apenas 30% do tempo temos uma confirmação clara de "Big Players".
-        rand_val = random.random()
-        if rand_val > 0.7:
-            tape_bias = "BULLISH_ABSORPTION"
-            institutional_absorption = True if signal in ["LONG", "BUY"] else False
-        elif rand_val < 0.3:
-            tape_bias = "BEARISH_ABSORPTION"
-            institutional_absorption = True if signal in ["SHORT", "SELL"] else False
-        else:
-            tape_bias = "MIXED_FLOW"
-            institutional_absorption = False
-            
         tape_score_modifier = 0.0
+        data_available = False
+
+        try:
+            from skills.broker_skills import MarketDepthL2Skill
+            l2_skill = MarketDepthL2Skill()
+            l2_data = await l2_skill.execute({})
+            data_available = l2_data.get("data_available", False)
+            
+            if data_available:
+                imbalance = l2_data.get("l2_imbalance", 0)
+                dominant = l2_data.get("dominant_force", "UNKNOWN")
+                absorption = l2_data.get("absorption_detected", False)
+                
+                if absorption and dominant == "BUYERS":
+                    tape_bias = "BULLISH_ABSORPTION"
+                    institutional_absorption = signal in ["LONG", "BUY"]
+                elif absorption and dominant == "SELLERS":
+                    tape_bias = "BEARISH_ABSORPTION"
+                    institutional_absorption = signal in ["SHORT", "SELL"]
+                else:
+                    tape_bias = "MIXED_FLOW"
+        except Exception as e:
+            logger.debug(f"Falha ao ler DOM L2 real: {e}")
+
+        # Se não há dados reais, mantém NEUTRAL sem penalidade (decisão segura)
+        if not data_available:
+            logger.info("[TAPE] DOM L2 indisponível — aplicando viés NEUTRAL sem penalidade.")
+            return {
+                "tape_bias": "NEUTRAL",
+                "institutional_absorption": False,
+                "tape_score_modifier": 0.0,
+                "data_available": False
+            }
         
         if institutional_absorption:
             tape_score_modifier = 0.20
@@ -53,5 +68,6 @@ class LiquidityHeatmapSkill(BaseSkill):
         return {
             "tape_bias": tape_bias,
             "institutional_absorption": institutional_absorption,
-            "tape_score_modifier": tape_score_modifier
+            "tape_score_modifier": tape_score_modifier,
+            "data_available": True
         }

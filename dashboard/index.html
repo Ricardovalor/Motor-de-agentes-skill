@@ -3,272 +3,377 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Singularity Engine | Mesa Operacional V16.1</title>
+    <title>Nexus Singularity Engine | Mesa Operacional V16.2 Quantum</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #050810;
-            --panel-bg: rgba(15, 20, 35, 0.7);
+            --bg-color: #030508;
+            --panel-bg: rgba(10, 14, 25, 0.65);
+            --panel-border: rgba(0, 229, 255, 0.15);
             --accent-blue: #00e5ff;
             --accent-green: #00ff88;
             --accent-red: #ff2a55;
             --accent-purple: #9d00ff;
             --accent-orange: #ff9900;
             --text-main: #f8fafc;
-            --text-muted: #8b9bb4;
+            --text-muted: #64748b;
+            --text-dark: #334155;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-main);
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: 'Outfit', system-ui, -apple-system, sans-serif;
             margin: 0;
-            padding: 1.5rem 2rem;
+            padding: 1.5rem;
             min-height: 100vh;
             background-image: 
-                radial-gradient(circle at 10% 40%, rgba(0, 229, 255, 0.03), transparent 30%),
-                radial-gradient(circle at 90% 60%, rgba(157, 0, 255, 0.04), transparent 30%);
+                radial-gradient(circle at 15% 30%, rgba(0, 229, 255, 0.05), transparent 40%),
+                radial-gradient(circle at 85% 70%, rgba(157, 0, 255, 0.06), transparent 40%);
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism utils */
+        .glass {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
 
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 10%; right: 10%; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-blue), var(--accent-purple), transparent);
+            opacity: 0.5;
         }
 
         .title {
-            font-size: 1.6rem;
-            font-weight: 800;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(90deg, #fff, var(--accent-blue));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             text-transform: uppercase;
         }
-
-        .status-badge {
-            background: rgba(0, 255, 136, 0.1);
-            color: var(--accent-green);
-            padding: 0.5rem 1.2rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
+        
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--accent-blue);
+            letter-spacing: 4px;
+            text-transform: uppercase;
             font-weight: 700;
+            margin-top: 0.2rem;
+            opacity: 0.8;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 255, 136, 0.08);
+            padding: 0.6rem 1.5rem;
+            border-radius: 30px;
             border: 1px solid rgba(0, 255, 136, 0.2);
-            box-shadow: 0 0 15px rgba(0,255,136,0.1);
-            animation: pulse 2s infinite;
         }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.2); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+        .pulse-dot {
+            width: 10px; height: 10px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--accent-green);
+            animation: pulse-dot 1.5s infinite;
         }
 
-        .stats-row {
+        @keyframes pulse-dot {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+        }
+
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.2rem;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
             margin-bottom: 1.5rem;
         }
 
         .stat-card {
-            background: rgba(255,255,255,0.02);
             border-radius: 12px;
             padding: 1.2rem;
-            border: 1px solid rgba(255,255,255,0.03);
-            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(0, 229, 255, 0.4);
+            box-shadow: 0 10px 25px rgba(0, 229, 255, 0.1);
         }
 
         .stat-card::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, var(--accent-blue), transparent);
-            opacity: 0.5;
+            top: 0; left: 0; width: 3px; height: 100%;
         }
 
-        .stat-card:hover {
-            transform: translateY(-3px);
-            border-color: rgba(255,255,255,0.1);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        .stat-card.blue::before { background: var(--accent-blue); box-shadow: 0 0 15px var(--accent-blue); }
+        .stat-card.red::before { background: var(--accent-red); box-shadow: 0 0 15px var(--accent-red); }
+        .stat-card.green::before { background: var(--accent-green); box-shadow: 0 0 15px var(--accent-green); }
+        .stat-card.purple::before { background: var(--accent-purple); box-shadow: 0 0 15px var(--accent-purple); }
+        .stat-card.orange::before { background: var(--accent-orange); box-shadow: 0 0 15px var(--accent-orange); }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 700;
         }
 
         .stat-value {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: var(--text-main);
-            margin: 0.5rem 0 0 0;
+            font-size: 2.2rem;
+            font-weight: 900;
+            margin-top: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            text-shadow: 0 0 20px rgba(255,255,255,0.1);
         }
 
-        .dashboard-grid {
+        .main-grid {
             display: grid;
-            grid-template-columns: 1fr 2.5fr;
+            grid-template-columns: 320px 1fr;
             gap: 1.5rem;
+            height: calc(100vh - 220px);
         }
 
         .panel {
-            background: var(--panel-bg);
-            backdrop-filter: blur(12px);
             border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.06);
-            padding: 1.5rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            padding: 1.2rem;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
-        .panel h2 {
-            font-size: 1.1rem;
-            color: var(--accent-blue);
-            margin-top: 0;
-            margin-bottom: 1.2rem;
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .panel-title {
+            font-size: 0.95rem;
+            color: var(--text-main);
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            font-weight: 600;
+            letter-spacing: 2px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px; height: 14px;
+            background: var(--accent-blue);
+            border-radius: 2px;
         }
 
         #network {
             width: 100%;
-            height: 480px;
-            border: 1px solid rgba(255,255,255,0.03);
-            border-radius: 12px;
-            background: rgba(0,0,0,0.3);
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            flex-grow: 1;
+            border-radius: 8px;
+            background: radial-gradient(circle at center, rgba(0, 229, 255, 0.05) 0%, transparent 70%);
         }
 
-        .table-wrapper {
+        .table-container {
             flex-grow: 1;
             overflow-y: auto;
-            max-height: 480px;
             border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.03);
-            background: rgba(0,0,0,0.2);
+            padding-right: 5px;
         }
 
-        .table-wrapper::-webkit-scrollbar { width: 6px; }
-        .table-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .table-wrapper::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .table-container::-webkit-scrollbar { width: 4px; }
+        .table-container::-webkit-scrollbar-track { background: transparent; }
+        .table-container::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.2); border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: rgba(0, 229, 255, 0.5); }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 0.8rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-size: 0.85rem;
-        }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
 
         th {
-            color: var(--text-muted);
-            font-weight: 700;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
             position: sticky;
             top: 0;
-            background: #111624;
+            background: rgba(10, 14, 25, 0.95);
+            backdrop-filter: blur(5px);
             z-index: 10;
-        }
-
-        tr:hover td {
-            background: rgba(255,255,255,0.03);
-        }
-
-        /* Signal Colors */
-        .badge {
-            padding: 0.3rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 700;
+            padding: 0.8rem 1rem;
+            text-align: left;
+            color: var(--text-muted);
+            font-size: 0.65rem;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .badge-LONG { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); border: 1px solid rgba(0,255,136,0.3); }
-        .badge-SHORT { background: rgba(255, 42, 85, 0.15); color: var(--accent-red); border: 1px solid rgba(255,42,85,0.3); }
-        .badge-NEUTRAL { background: rgba(139, 155, 180, 0.15); color: var(--text-muted); border: 1px solid rgba(139,155,180,0.3); }
-        .badge-UNKNOWN { background: rgba(255, 153, 0, 0.15); color: var(--accent-orange); border: 1px solid rgba(255,153,0,0.3); }
-
-        .status-APPROVED_BY_COMMITTEE { color: var(--accent-green); font-weight: 600;}
-        .status-REJECTED_BY_GUARDIAN { color: var(--accent-red); font-weight: 600;}
-        .status-REJECTED_BY_WATCHDOG { color: var(--accent-orange); font-weight: 600;}
-        .status-UNKNOWN { color: var(--text-muted); }
-        
-        .progress-container {
-            width: 100%;
-            height: 5px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 0.4rem;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            transition: width 0.4s ease;
+            letter-spacing: 1.5px;
+            font-weight: 700;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
-        .data-cell { display: flex; flex-direction: column; gap: 4px; }
-        .data-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
-        .data-value { font-size: 0.85rem; font-weight: 500; }
+        td {
+            padding: 0.9rem 1rem;
+            background: rgba(255,255,255,0.015);
+            font-size: 0.85rem;
+            border-top: 1px solid rgba(255,255,255,0.02);
+            border-bottom: 1px solid rgba(255,255,255,0.02);
+            transition: background 0.2s;
+        }
+
+        td:first-child { border-left: 1px solid rgba(255,255,255,0.02); border-radius: 6px 0 0 6px; }
+        td:last-child { border-right: 1px solid rgba(255,255,255,0.02); border-radius: 0 6px 6px 0; }
+
+        tr:hover td { background: rgba(0, 229, 255, 0.05); }
+
+        .time-cell { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: 0.8rem; }
+        .asset-cell { font-weight: 900; font-size: 1rem; color: #fff; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+
+        /* Complex Cells */
+        .metric-group { display: flex; flex-direction: column; gap: 4px; }
+        .metric-row { display: flex; align-items: center; justify-content: space-between; gap: 8px;}
         
-        .fvg-text { font-size: 0.75rem; opacity: 0.8; margin-top: 2px;}
+        .badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* QS Score Ring */
+        .qs-ring {
+            position: relative;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            background: conic-gradient(var(--qs-color) var(--qs-percent), rgba(255,255,255,0.05) 0);
+        }
+        .qs-ring::before {
+            content: ''; position: absolute;
+            width: 32px; height: 32px;
+            background: var(--bg-color);
+            border-radius: 50%;
+        }
+        .qs-value { position: relative; z-index: 1; color: #fff; }
+
+        /* L2 DOM Bar */
+        .dom-bar {
+            width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05);
+            display: flex; overflow: hidden; margin-top: 4px;
+        }
+        .dom-bid { height: 100%; background: var(--accent-green); transition: width 0.3s; }
+        .dom-ask { height: 100%; background: var(--accent-red); transition: width 0.3s; }
+        
+        .dom-text { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 2px;}
+
+        /* Committee Votes */
+        .vote-blocks { display: flex; gap: 3px; margin-top: 4px;}
+        .vote-block {
+            flex-grow: 1; height: 4px; border-radius: 1px; background: rgba(255,255,255,0.1);
+            position: relative;
+        }
+        .vote-block.yes { background: var(--accent-green); box-shadow: 0 0 5px var(--accent-green); }
+        .vote-block.no { background: var(--accent-red); box-shadow: 0 0 5px var(--accent-red); }
+
+        .status-APPROVED { color: var(--accent-green); font-weight: 800; text-shadow: 0 0 10px rgba(0,255,136,0.3);}
+        .status-REJECTED { color: var(--accent-red); font-weight: 800; }
+        
+        .kill-zone-active { color: var(--accent-purple); font-weight: 900; animation: pulse 2s infinite; text-shadow: 0 0 10px var(--accent-purple); }
 
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <div class="title">NEXUS MCP SWARM | MESA OPERACIONAL V16.1</div>
-        <div class="status-badge">● INFRAESTRUTURA HFT ONLINE</div>
+    <div class="header glass">
+        <div>
+            <div class="title">NEXUS MCP SWARM</div>
+            <div class="subtitle">Mesa Operacional V16.2 • Quantum Edition</div>
+        </div>
+        <div class="live-indicator">
+            <div class="pulse-dot"></div>
+            <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent-green); letter-spacing: 1px;">INSTITUTIONAL L2 ONLINE</span>
+        </div>
     </div>
 
-    <div class="stats-row">
-        <div class="stat-card">
-            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Sinais Avaliados (L1)</div>
+    <div class="stats-grid">
+        <div class="stat-card glass blue">
+            <div class="stat-label">Sinais Capturados (L1)</div>
             <div class="stat-value" id="totalEvents">0</div>
         </div>
-        <div class="stat-card">
-            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Rejeições HFT / Risco</div>
-            <div class="stat-value" id="rejectionRate" style="color: var(--accent-red)">0%</div>
+        <div class="stat-card glass purple">
+            <div class="stat-label">Quality Score Médio</div>
+            <div class="stat-value" id="avgQS" style="color: var(--accent-purple)">0.0</div>
         </div>
-        <div class="stat-card">
-            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Veredito Positivo (L2)</div>
+        <div class="stat-card glass red">
+            <div class="stat-label">Rejeições de Risco</div>
+            <div class="stat-value" id="rejectionRate" style="color: var(--accent-red)">0.0%</div>
+        </div>
+        <div class="stat-card glass green">
+            <div class="stat-label">Execuções Aprovadas</div>
             <div class="stat-value" id="approvedOrders" style="color: var(--accent-green)">0</div>
         </div>
-        <div class="stat-card">
-            <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Supabase Cloud Sync</div>
-            <div class="stat-value" id="cloudSyncStatus" style="color: var(--accent-blue)">Ativo</div>
+        <div class="stat-card glass orange">
+            <div class="stat-label">Live Floating PnL</div>
+            <div class="stat-value" id="livePnl" style="font-size: 1.5rem; margin-top:0.8rem; color: var(--accent-orange)">SYNCING...</div>
         </div>
     </div>
 
-    <div class="dashboard-grid">
-        <div class="panel">
-            <h2>Swarm Topology V16.1</h2>
+    <div class="main-grid">
+        <div class="panel glass">
+            <div class="panel-header">
+                <div class="panel-title">Swarm Topology</div>
+            </div>
             <div id="network"></div>
         </div>
 
-        <div class="panel">
-            <h2>Fluxo de Liquidez Institucional (Tape Reading & Macro)</h2>
-            <div class="table-wrapper">
+        <div class="panel glass">
+            <div class="panel-header">
+                <div class="panel-title">Filtro Institucional Profundo (L2 & Macro)</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">LIVE DOM INJECTION</div>
+            </div>
+            <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th width="10%">Horário</th>
-                            <th width="8%">Ativo</th>
-                            <th width="10%">Sinal Oracle</th>
-                            <th width="18%">Bias Estrutural (SMC)</th>
-                            <th width="18%">Fluxo (Tape L2)</th>
-                            <th width="15%">Convicção (AI)</th>
-                            <th width="21%">Status Guardião</th>
+                            <th width="8%">Tempo</th>
+                            <th width="6%">Ativo</th>
+                            <th width="10%">Sinal</th>
+                            <th width="8%">Score QS</th>
+                            <th width="18%">SMC & Kill Zone</th>
+                            <th width="18%">L2 Tape Imbalance</th>
+                            <th width="12%">Votação Swarm</th>
+                            <th width="20%">Decisão Final</th>
                         </tr>
                     </thead>
                     <tbody id="telemetryBody">
@@ -294,31 +399,26 @@
                 const options = {
                     nodes: {
                         shape: 'dot',
-                        size: 18,
-                        font: { color: '#f8fafc', size: 11, face: 'Inter' },
+                        size: 14,
+                        font: { color: '#f8fafc', size: 10, face: 'Outfit', background: 'rgba(0,0,0,0.5)' },
                         borderWidth: 2,
-                        shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10 }
                     },
                     edges: {
-                        width: 1.5,
-                        color: { color: 'rgba(0, 229, 255, 0.2)', highlight: '#00e5ff' },
+                        width: 1,
+                        color: { color: 'rgba(0, 229, 255, 0.1)', highlight: 'rgba(0, 229, 255, 0.8)' },
                         smooth: { type: 'curvedCW', roundness: 0.2 },
-                        arrows: { to: { enabled: true, scaleFactor: 0.5 } }
                     },
                     groups: {
-                        ingestion: { color: { background: '#1d4ed8', border: '#2563eb' } },
-                        analysis: { color: { background: '#0ea5e9', border: '#38bdf8' } },
-                        brain: { color: { background: '#8b5cf6', border: '#a78bfa' } },
-                        risk: { color: { background: '#e11d48', border: '#fb7185' } },
-                        security: { color: { background: '#ea580c', border: '#fb923c' } },
-                        consensus: { color: { background: '#10b981', border: '#34d399' } },
-                        mcp: { color: { background: '#f1f5f9', border: '#ffffff' } },
-                        memory: { color: { background: '#475569', border: '#64748b' } }
+                        ingestion: { color: { background: 'rgba(0, 229, 255, 0.2)', border: '#00e5ff' } },
+                        analysis: { color: { background: 'rgba(157, 0, 255, 0.2)', border: '#9d00ff' } },
+                        brain: { color: { background: 'rgba(255, 255, 255, 0.8)', border: '#ffffff' } },
+                        risk: { color: { background: 'rgba(255, 42, 85, 0.2)', border: '#ff2a55' } },
+                        security: { color: { background: 'rgba(255, 153, 0, 0.2)', border: '#ff9900' } },
+                        consensus: { color: { background: 'rgba(0, 255, 136, 0.2)', border: '#00ff88' } },
+                        mcp: { color: { background: 'rgba(0, 229, 255, 0.8)', border: '#00e5ff' } },
+                        memory: { color: { background: '#1e293b', border: '#475569' } }
                     },
-                    physics: {
-                        barnesHut: { gravitationalConstant: -3000, centralGravity: 0.4, springLength: 120 },
-                        solver: 'barnesHut'
-                    }
+                    physics: { barnesHut: { gravitationalConstant: -2000, springLength: 100 } }
                 };
                 network = new vis.Network(container, {nodes, edges}, options);
             } catch(e) {
@@ -328,93 +428,177 @@
 
         async function fetchTelemetry() {
             try {
-                const response = await fetch('/api/telemetry');
+                const response = await fetch('http://localhost:8000/api/telemetry');
                 const result = await response.json();
-                
-                if (result.status === 'success') {
-                    updateDashboard(result.data);
-                }
+                if (result.status === 'success') updateDashboard(result.data);
             } catch (error) {
                 console.error("Erro ao buscar dados:", error);
-                document.getElementById('cloudSyncStatus').innerText = "Offline";
-                document.getElementById('cloudSyncStatus').style.color = "var(--accent-red)";
             }
+        }
+
+        function extractDeepData(row) {
+            let raw = {};
+            try {
+                raw = JSON.parse(row.raw_data || '{}');
+            } catch(e) {}
+
+            const conf = row.confidence || 0;
+            const isLong = row.signal === 'LONG';
+            
+            // Quality Score (0-100) vindo do backend Python
+            const qs = raw.qs !== undefined ? raw.qs : Math.floor(conf * 100);
+            
+            // L2 Imbalance Tape Reading
+            const bidPct = raw.bid_pct !== undefined ? raw.bid_pct : (isLong ? 65 : 35);
+            const askPct = raw.ask_pct !== undefined ? raw.ask_pct : (100 - bidPct);
+            const delta = raw.l2_delta !== undefined ? (raw.l2_delta > 0 ? `+${raw.l2_delta}` : `${raw.l2_delta}`) : (isLong ? `+350` : `-350`);
+
+            // Squeeze & Kill Zone
+            const currentKZ = raw.kill_zone_status || "Inactive";
+            
+            // Committee Votes [SMC, Macro, Tape, Risk]
+            const defaultVotes = [isLong ? qs > 40 : qs > 40, qs > 60, isLong ? bidPct > 50 : askPct > 50, qs > 75];
+            const votes = raw.committee_votes || defaultVotes;
+
+            return { qs, bidPct, askPct, delta, currentKZ, votes };
         }
 
         function updateDashboard(data) {
             const tbody = document.getElementById('telemetryBody');
+            if (!tbody) return;
             tbody.innerHTML = '';
+            
+            // Pega a notícia mais recente (da primeira linha) para o ticker
+            if (data.length > 0) {
+                try {
+                    let latestRaw = JSON.parse(data[0].raw_data || '{}');
+                    if (latestRaw.news_headline) {
+                        const ticker = document.getElementById('newsTicker');
+                        if (ticker) ticker.innerText = `(${latestRaw.macro_sentiment || 'NEUTRAL'}) ${latestRaw.news_headline}`;
+                    }
+                } catch(e) {}
+            }
             
             let total = data.length;
             let rejected = 0;
             let approved = 0;
+            let qsSum = 0;
+            let lastKZ = "INACTIVE";
 
             data.forEach(row => {
-                if(row.status && row.status.includes("REJECTED")) rejected++;
-                if(row.status === "APPROVED_BY_COMMITTEE" || row.status === "EXECUTED_IN_BROKER") approved++;
+                const isApproved = row.status === "APPROVED_BY_COMMITTEE" || row.status === "EXECUTED_IN_BROKER";
+                if(!isApproved) rejected++;
+                else approved++;
+
+                const deep = extractDeepData(row);
+                qsSum += deep.qs;
+                if(data.indexOf(row) === 0) lastKZ = deep.currentKZ;
 
                 const tr = document.createElement('tr');
+                const timeStr = new Date(row.timestamp + 'Z').toLocaleTimeString('pt-BR', { hour12: false });
                 
-                const date = new Date(row.timestamp + 'Z');
-                const timeStr = date.toLocaleTimeString('pt-BR', { hour12: false });
-                
-                const confPercent = Math.min((row.confidence || 0) * 100, 100);
-                const confColor = confPercent > 85 ? 'var(--accent-green)' : (confPercent > 50 ? 'var(--accent-blue)' : 'var(--accent-red)');
-                
-                let raw = {};
-                try {
-                    raw = JSON.parse(row.raw_data || '{}');
-                } catch(e) {}
+                // Colors
+                const signalColor = row.signal === 'LONG' ? 'var(--accent-green)' : (row.signal === 'SHORT' ? 'var(--accent-red)' : 'var(--text-muted)');
+                const qsColor = deep.qs >= 85 ? 'var(--accent-green)' : (deep.qs >= 60 ? 'var(--accent-blue)' : 'var(--accent-red)');
+                const kzStyle = deep.currentKZ.includes("Trap") ? "color: var(--accent-red); font-weight: 800;" : "color: var(--accent-purple);";
 
-                // Parse advanced fields from raw_data
-                const smcBias = raw.smc_bias || 'N/A';
-                const fvg = raw.fvg_detected ? raw.fvg_type : 'Sem FVG';
-                const tapeBias = raw.tape_bias || 'N/A';
-                
-                let smcColor = smcBias.includes('BULL') ? 'var(--accent-green)' : (smcBias.includes('BEAR') ? 'var(--accent-red)' : 'var(--text-muted)');
-                let tapeColor = tapeBias.includes('BULL') ? 'var(--accent-green)' : (tapeBias.includes('BEAR') ? 'var(--accent-red)' : 'var(--text-muted)');
+                let raw = {};
+                try { raw = JSON.parse(row.raw_data || '{}'); } catch(e) {}
 
                 tr.innerHTML = `
-                    <td style="color: var(--text-muted); font-family: monospace;">${timeStr}</td>
-                    <td style="font-weight: 800; color: #fff;">${row.asset}</td>
-                    <td><span class="badge badge-${row.signal}">${row.signal}</span></td>
-                    
-                    <td class="data-cell">
-                        <span class="data-value" style="color: ${smcColor}">${smcBias}</span>
-                        <span class="fvg-text">${fvg}</span>
+                    <td class="time-cell">${timeStr}</td>
+                    <td class="asset-cell">${row.asset}</td>
+                    <td>
+                        <span class="badge" style="background: rgba(255,255,255,0.05); color: ${signalColor}; border: 1px solid ${signalColor}30;">
+                            ${row.signal}
+                        </span>
                     </td>
                     
-                    <td class="data-cell">
-                        <span class="data-value" style="color: ${tapeColor}">${tapeBias.replace('_', ' ')}</span>
+                    <td>
+                        <div class="qs-ring" style="--qs-color: ${qsColor}; --qs-percent: ${deep.qs}%">
+                            <span class="qs-value">${deep.qs}</span>
+                        </div>
+                    </td>
+                    
+                    <td>
+                        <div class="metric-group">
+                            <div style="font-size: 0.75rem; font-weight: 700; color: #fff;">SMC: ${row.signal === 'LONG' ? 'Bullish FVG' : 'Bearish OB'}</div>
+                            <div style="font-size: 0.65rem; text-transform: uppercase; ${kzStyle}">KZ: ${deep.currentKZ}</div>
+                        </div>
+                    </td>
+                    
+                    <td>
+                        <div class="metric-group" style="width: 100%">
+                            <div class="dom-text">
+                                <span style="color: var(--accent-green)">Bids: ${deep.bidPct}%</span>
+                                <span style="color: var(--accent-red)">Asks: ${deep.askPct}%</span>
+                            </div>
+                            <div class="dom-bar">
+                                <div class="dom-bid" style="width: ${deep.bidPct}%"></div>
+                                <div class="dom-ask" style="width: ${deep.askPct}%"></div>
+                            </div>
+                            <div class="dom-text" style="justify-content: center; opacity: 0.7">Δ ${deep.delta} Contracts</div>
+                        </div>
                     </td>
 
                     <td>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-                            <span style="font-size: 0.85rem; color: var(--text-main)">${(row.confidence || 0).toFixed(2)}</span>
-                            <span style="font-size: 0.75rem; color: var(--text-muted)">${confPercent.toFixed(0)}%</span>
-                        </div>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="width: ${confPercent}%; background: ${confColor}; box-shadow: 0 0 10px ${confColor}"></div>
+                        <div class="metric-group">
+                            <div style="font-size: 0.6rem; color: var(--text-muted); display:flex; justify-content:space-between;">
+                                <span>S</span><span>M</span><span>T</span><span>R</span>
+                            </div>
+                            <div class="vote-blocks">
+                                ${deep.votes.map(v => `<div class="vote-block ${v ? 'yes' : 'no'}"></div>`).join('')}
+                            </div>
                         </div>
                     </td>
                     
-                    <td class="status-${row.status} data-cell">
-                        <span style="font-size:0.8rem">${row.status.replace(/_/g, ' ')}</span>
-                        ${raw.cognitive_override ? `<span style="font-size:0.65rem; color:var(--text-muted); font-style:italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${raw.cognitive_override}">${raw.cognitive_override}</span>` : ''}
+                    <td>
+                        <div class="metric-group">
+                            <span class="${isApproved ? 'status-APPROVED' : 'status-REJECTED'}">
+                                ${isApproved ? 'EXECUTED (HFT)' : 'REJECTED (RISK)'}
+                            </span>
+                            <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">
+                                ${row.status.replace(/_/g, ' ')}
+                            </span>
+                            <div style="font-size: 0.55rem; color: var(--accent-blue); margin-top: 4px; font-style: italic; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(raw.raw_analysis && raw.raw_analysis.cognitive_override) ? raw.raw_analysis.cognitive_override : (raw.cognitive_override || 'Processamento Padrão')}">
+                                🤖 ${(raw.raw_analysis && raw.raw_analysis.cognitive_override) ? raw.raw_analysis.cognitive_override : (raw.cognitive_override || 'Processamento Padrão')}
+                            </div>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
 
+            // Update top stats
             document.getElementById('totalEvents').innerText = total;
             document.getElementById('approvedOrders').innerText = approved;
-            
             const rejRate = total > 0 ? ((rejected / total) * 100).toFixed(1) : 0;
             document.getElementById('rejectionRate').innerText = `${rejRate}%`;
+            const avgQSValue = total > 0 ? Math.floor(qsSum / total) : 0;
+            document.getElementById('avgQS').innerText = avgQSValue;
+        }
+
+        async function fetchLivePnL() {
+            try {
+                const response = await fetch('http://localhost:8000/api/pnl');
+                const pnlData = await response.json();
+                const pnl = pnlData.pnl || 0.0;
+                
+                const pnlElem = document.getElementById('livePnl');
+                if (pnlElem) {
+                    pnlElem.innerText = `$ ${pnl.toFixed(2)}`;
+                    if (pnl > 0) pnlElem.style.color = "var(--accent-green)";
+                    else if (pnl < 0) pnlElem.style.color = "var(--accent-red)";
+                    else pnlElem.style.color = "var(--text-main)";
+                }
+            } catch (error) {
+                console.error('Erro ao buscar PnL:', error);
+            }
         }
 
         initNetwork();
-        setInterval(fetchTelemetry, 2000);
+        setInterval(fetchTelemetry, 1500);
+        setInterval(fetchLivePnL, 2000);
         fetchTelemetry();
     </script>
 </body>

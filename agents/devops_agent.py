@@ -5,9 +5,11 @@ import asyncio
 class DevOpsWatchdogAgent(BaseAgent):
     """
     O Cão de Guarda da Infraestrutura HFT.
-    Monitora a saúde do servidor a cada X segundos para garantir que o 
-    Motor não opere às cegas. Possui autoridade máxima para vetar trades
-    ou zerar a conta.
+    V10.0 Fase 2: Upgrade com FLATTEN real via Tradovate API.
+    
+    Dupla proteção (belt-and-suspenders):
+    - Camada 1: TradovateAPI.flatten_all() → liquida via API REST
+    - Camada 2: KillSwitch log + abort pipeline → impede novas ordens
     """
     def __init__(self):
         super().__init__(name="DevOps-Watchdog", role="Protetor da Infraestrutura e Latência")
@@ -32,6 +34,15 @@ class DevOpsWatchdogAgent(BaseAgent):
             self.logger.critical(f"❌ INFRAESTRUTURA COMPROMETIDA! Abortando trade {insight.get('asset')} e isolando sistema!")
             insight["status"] = "REJECTED_BY_WATCHDOG"
             insight["rejection_reason"] = "Falha Crítica no Servidor/Rede (Ping ou RAM)"
+            
+            # === FASE 2: FLATTEN REAL VIA API ===
+            if "TradovateAPI" in self.skills:
+                self.logger.critical("🚨 KILL SWITCH: Executando FLATTEN ALL via Tradovate API...")
+                try:
+                    flatten_result = await self.skills["TradovateAPI"].flatten_all()
+                    self.logger.critical(f"🚨 FLATTEN RESULT: {flatten_result}")
+                except Exception as e:
+                    self.logger.critical(f"🚨 FLATTEN API FAILED: {e}. Posições podem estar abertas!")
             
             # Cortamos as asas do Oracle antes mesmo do Guardião ver a ordem
             await self.bus.publish(Message(sender=self.name, topic="action_rejected", payload=insight))

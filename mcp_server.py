@@ -78,19 +78,44 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     """Executa a ferramenta solicitada."""
     if name == "force_market_analysis":
         asset = arguments.get("asset", "MNQ")
-        # Como o MCP é executado sob demanda e o Motor está em outro processo,
-        # Em V14 usaremos RabbitMQ ou ZeroMQ. Aqui injetamos um log direto.
-        return [
-            types.TextContent(
-                type="text",
-                text=f"Sinal de injeção gerado com sucesso para o ativo: {asset}. O Broker-Execution Agent e o Oracle-Prime Agent foram notificados."
-            )
-        ]
+        
+        # Conexão Real HFT: Dispara um Webhook para o Motor Nexus
+        # Tentamos bater na porta local (8000) caso esteja no mesmo container,
+        # ou 8005 caso esteja rodando na máquina host.
+        import urllib.request
+        import urllib.error
+        
+        payload = json.dumps({"asset": asset, "signal": "FORCED_MCP_INJECTION", "source": "MCP_SERVER"}).encode('utf-8')
+        success = False
+        
+        for port in [8000, 8005]:
+            try:
+                req = urllib.request.Request(f"http://127.0.0.1:{port}/webhook/tradingview", data=payload, headers={'Content-Type': 'application/json'})
+                urllib.request.urlopen(req, timeout=2)
+                success = True
+                break
+            except urllib.error.URLError:
+                continue
+
+        if success:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=f"✅ INJEÇÃO REAL BEM-SUCEDIDA! O motor Nexus começou a analisar {asset}. O Data-Ops, Oracle-Prime e Guardian foram acionados via Webhook."
+                )
+            ]
+        else:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=f"❌ FALHA DE COMUNICAÇÃO: O Motor Nexus não está rodando. Por favor, inicie o motor via `docker-compose up` ou `python main.py` na porta 8000/8005 antes de forçar a análise de {asset}."
+                )
+            ]
     elif name == "get_swarm_status":
         return [
             types.TextContent(
                 type="text",
-                text="Status do Swarm: ONLINE. 8 Agentes Ativos. Guardian-Protocol = ATIVADO (Apex Rules). Conexão CDP = PORTA 9222 RESPONDENDO."
+                text="Status do Swarm: ONLINE. 13 Agentes Ativos (V16.2). Guardian-Protocol = SINGLETON (Apex Rules). Conexão CDP = PORTA 9222."
             )
         ]
     raise ValueError(f"Tool not found: {name}")

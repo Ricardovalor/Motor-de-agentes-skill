@@ -1,0 +1,274 @@
+{
+  "_version": "V10.0-production",
+  "_updated": "2026-05-11",
+  "_risk_strategy": "V10.0 PRODUCTION: MNQ SL 2.5x ATR (anti-sweep), MGC SL 1.2x (R:R fix), micro-trend guard, dynamic QS, sweep confirmation. Audited by Senior Chief Analyst.",
+
+  "provider": "APEX",
+  "plan": "EOD_50K",
+  "phase": "EVALUATION",
+  "broker": "TRADOVATE",
+
+  "account_type": "APEX_50K",
+  "account_size": 50000,
+  "profit_target": 3000,
+
+  "max_daily_loss": 1000,
+  "dll_behavior": "PAUSE_SESSION",
+  "dll_note": "DLL pauses trades for remainder of session. Does NOT fail evaluation.",
+
+  "max_trailing_drawdown": 2000,
+  "trailing_drawdown_limit": 2000,
+  "drawdown_model": "EOD",
+
+  "eod_drawdown_config": {
+    "calculation_time": "16:59",
+    "timezone": "America/New_York",
+    "trailing_behavior_tradovate": "NEVER_STOPS",
+    "trailing_behavior_rithmic": "STOPS_AT_BALANCE_PLUS_100",
+    "trailing_behavior_pa": "STOPS_AT_INITIAL_PLUS_100",
+    "note": "EOD threshold = peak_eod_balance - max_drawdown. Applied NEXT session."
+  },
+
+  "market_close": {
+    "close_time": "16:59",
+    "timezone": "America/New_York",
+    "warning_minutes": [15, 5, 1],
+    "auto_flatten": true,
+    "auto_flatten_time": "16:55"
+  },
+
+  "max_daily_trades": 3,
+  "risk_per_trade_percent": 1,
+  "max_risk_reward_ratio": 5,
+  "safety_net_offset": 100,
+
+  "consistency_rule": {
+    "enabled_in_evaluation": false,
+    "enabled_in_pa": true,
+    "max_single_day_percent": 50,
+    "note": "No single day can exceed 50% of total profit. Only applies in PA phase."
+  },
+
+  "evaluation_rules": {
+    "profit_target": 3000,
+    "max_drawdown": 2000,
+    "drawdown_type": "EOD",
+    "daily_loss_limit": 1000,
+    "dll_behavior": "PAUSE_SESSION",
+    "max_contracts_mini": 6,
+    "max_contracts_micro": 60,
+    "min_trading_days": 1,
+    "access_period_days": 30,
+    "consistency_rule": false,
+    "scaling_rule": false,
+    "activation_fee": 119,
+    "activation_deadline_days": 7
+  },
+
+  "pa_rules": {
+    "max_contracts_mini": 4,
+    "max_contracts_micro": 40,
+    "consistency_rule_percent": 50,
+    "scaling_enabled": true,
+    "max_drawdown": 2000,
+    "drawdown_type": "EOD",
+    "daily_loss_limit": 1000,
+    "payout_frequency_days": 5,
+    "max_accounts": 20,
+    "safety_net": true,
+    "safety_net_threshold": 100,
+    "profit_split_first_25k": 100,
+    "profit_split_after_25k": 90
+  },
+
+  "asset_profiles": {
+    "MNQ": {
+      "class": "INDEX",
+      "name": "Micro E-mini Nasdaq",
+      "eval_max_contracts": 60,
+      "pa_max_contracts": 40,
+      "max_contracts": 2,
+      "commission_per_contract": 0.62,
+      "tick_value": 0.50,
+      "tick_size": 0.25,
+      "atr_sl_mult": 2.5,
+      "sl_multiplier": 2.5,
+      "tp1_multiplier": 2.0,
+      "tp2_multiplier": 3.0,
+      "rr_tp1": 2.0,
+      "rr_tp2": 3.0,
+      "displacement_mult": 1.0,
+      "min_quality_score": 4.5,
+      "signal_persistence_bars": 2,
+      "squeeze_bb_len": 20,
+      "squeeze_kc_mult": 1.5,
+      "cooldown_bars": 6,
+      "chop_threshold": 65.0,
+      "adr_exhaust_pct": 85.0,
+      "kill_zones": ["NY_OPEN", "POWER_HOUR", "LONDON", "MID_DAY"],
+      "asset_profile_id": 0,
+      "status": "ACTIVE",
+      "correlation_group": "NASDAQ",
+      "backtest_results": {
+        "version": "9.2.2",
+        "period": "2026-03-15 to 2026-05-07",
+        "trades": 47,
+        "win_rate": 46.81,
+        "profit_factor": 2.475,
+        "total_pnl": 3424,
+        "max_drawdown": 883,
+        "apex_target_met": true
+      }
+    },
+    "MGC": {
+      "class": "METAL",
+      "name": "Micro Gold",
+      "eval_max_contracts": 6,
+      "pa_max_contracts": 4,
+      "max_contracts": 2,
+      "commission_per_contract": 1.25,
+      "tick_value": 1.00,
+      "tick_size": 0.10,
+      "atr_sl_mult": 1.2,
+      "sl_multiplier": 1.2,
+      "tp1_multiplier": 1.5,
+      "tp2_multiplier": 3.0,
+      "rr_tp1": 1.5,
+      "rr_tp2": 3.0,
+      "displacement_mult": 0.8,
+      "min_quality_score": 4.0,
+      "signal_persistence_bars": 3,
+      "squeeze_bb_len": 20,
+      "squeeze_kc_mult": 1.5,
+      "cooldown_bars": 6,
+      "chop_threshold": 65.0,
+      "adr_exhaust_pct": 85.0,
+      "kill_zones": ["NY_OPEN", "POWER_HOUR", "LONDON", "MID_DAY"],
+      "asset_profile_id": 1,
+      "status": "ACTIVE",
+      "correlation_group": "GOLD",
+      "backtest_results": {
+        "version": "9.2.2",
+        "period": "2026-03-15 to 2026-05-07",
+        "trades": 62,
+        "win_rate": 45.16,
+        "profit_factor": 2.08,
+        "total_pnl": 3065,
+        "max_drawdown": 1104,
+        "apex_target_met": true
+      }
+    }
+  },
+
+  "correlation_groups": {
+    "NASDAQ": ["MNQ", "NQ"],
+    "GOLD": ["MGC", "GC"]
+  },
+
+  "prohibited_activities": {
+    "hedging": true,
+    "copy_trading": true,
+    "news_straddling": true,
+    "dca_on_losers": true,
+    "hold_past_close": true,
+    "exceed_contract_limits": true,
+    "use_full_size_without_scaling": true,
+    "automation_without_manual_confirmation": true
+  },
+
+  "kill_zone_definitions": {
+    "NY_OPEN": {
+      "start": "0930", "end": "1100",
+      "label": "NY Open",
+      "timezone": "America/New_York",
+      "assets": ["MNQ", "MGC"],
+      "priority": "HIGH"
+    },
+    "POWER_HOUR": {
+      "start": "1500", "end": "1600",
+      "label": "Power Hour",
+      "timezone": "America/New_York",
+      "assets": ["MNQ", "MGC"],
+      "priority": "MEDIUM"
+    },
+    "LONDON": {
+      "start": "0200", "end": "0500",
+      "label": "London Session",
+      "timezone": "America/New_York",
+      "assets": ["MNQ", "MGC"],
+      "priority": "MEDIUM"
+    },
+    "MID_DAY": {
+      "start": "1100", "end": "1500",
+      "label": "Mid-Day Session",
+      "timezone": "America/New_York",
+      "assets": ["MNQ", "MGC"],
+      "priority": "LOW"
+    }
+  },
+
+  "mffu_profiles": {
+    "RAPID_50K": {
+      "profit_target": 3000,
+      "max_drawdown": 2000,
+      "drawdown_type": "EOD",
+      "daily_loss_limit": null,
+      "max_contracts_mini": 5,
+      "max_contracts_micro": 50,
+      "min_trading_days": 2,
+      "consistency_rule_percent": 50,
+      "price_monthly": 157,
+      "activation_fee": 0,
+      "payout_frequency": "daily"
+    },
+    "PRO_50K": {
+      "profit_target": 3000,
+      "max_drawdown": 2000,
+      "drawdown_type": "EOD",
+      "daily_loss_limit": null,
+      "max_contracts_mini": 3,
+      "max_contracts_micro": 30,
+      "min_trading_days": 2,
+      "consistency_rule_percent": 50,
+      "price_monthly": 227,
+      "activation_fee": 0,
+      "payout_frequency": "biweekly"
+    },
+    "BUILDER_50K": {
+      "profit_target": 2500,
+      "max_drawdown": 2000,
+      "drawdown_type": "EOD",
+      "daily_loss_limit": null,
+      "max_contracts_mini": 3,
+      "max_contracts_micro": 30,
+      "min_trading_days": 5,
+      "consistency_rule_percent": 50,
+      "price_onetime": 315,
+      "activation_fee": 0,
+      "payout_frequency": "biweekly"
+    }
+  },
+
+  "payout_rules": {
+    "min_qualifying_days": 5,
+    "min_daily_profit_qualifying": 100,
+    "max_lifetime_payouts": 6,
+    "profit_split_first_25k": 100,
+    "profit_split_after_25k": 90,
+    "inactivity_min_days_month": 2,
+    "inactivity_min_profit": 50
+  },
+
+  "scaling_plan": {
+    "level_1": { "balance_above": 50000, "max_contracts_nq": 2, "max_contracts_mnq": 6 },
+    "level_2": { "balance_above": 52500, "max_contracts_nq": 3, "max_contracts_mnq": 12 },
+    "level_3": { "balance_above": 55000, "max_contracts_nq": 4, "max_contracts_mnq": 15 }
+  },
+
+  "mandatory_stop_loss": true,
+  "no_hedging": true,
+  "no_dca_on_losers": true,
+  "eod_close_required": true,
+
+  "notes": "Nexus Zenith V7.0 — Full Apex 4.0 + MFFU compliance. EOD drawdown. Multi-phase (EVALUATION/PA). Multi-provider. Updated May 2026."
+}

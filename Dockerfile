@@ -7,10 +7,13 @@ ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
-# Instala dependências do sistema
-RUN apt-get update && apt-get install -y \
+# Instala dependências do sistema e Node.js para o TradingView MCP Server
+RUN apt-get update && apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y \
     build-essential \
     libsqlite3-dev \
+    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -21,8 +24,11 @@ RUN pip install --upgrade pip && \
 # Copia o código do motor
 COPY . .
 
+# Instala as dependências do servidor MCP Node.js (se existirem)
+RUN if [ -d "tradingview-mcp" ]; then cd tradingview-mcp && npm install; fi
+
 # Expõe a porta padrão para futuro dashboard/API
-EXPOSE 8000
+EXPOSE 8005
 
 # Executa o Event Loop do motor
 CMD ["python", "main.py"]

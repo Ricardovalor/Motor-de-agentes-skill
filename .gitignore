@@ -1,0 +1,33 @@
+# ============================================
+# NEXUS ZENITH — Motor de Agentes Skill
+# ============================================
+
+# Segredos (NUNCA commitar)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Dados locais
+memory_data/
+chroma_data/
+*.db
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store

@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 import json
 import sqlite3
 import os
+import threading
 try:
     import chromadb
 except ImportError:
@@ -27,19 +28,21 @@ class VectorMemory:
             self.knowledge_base = []
             
         self.doc_id = 0
+        self._lock = threading.Lock()
 
     def store(self, context: str, metadata: dict = None):
         if self.client:
-            self.doc_id += 1
+            with self._lock:
+                self.doc_id += 1
+                doc_id = self.doc_id
             meta = metadata or {}
-            # Converte valores do dicionario para string para o Chroma
             meta = {k: str(v) for k, v in meta.items()}
             self.collection.add(
                 documents=[context],
                 metadatas=[meta],
-                ids=[f"doc_{self.doc_id}"]
+                ids=[f"doc_{doc_id}"]
             )
-            logger.info(f"Contexto armazenado no ChromaDB [ID doc_{self.doc_id}]")
+            logger.info(f"Contexto armazenado no ChromaDB [ID doc_{doc_id}]")
         else:
             self.knowledge_base.append(context)
 

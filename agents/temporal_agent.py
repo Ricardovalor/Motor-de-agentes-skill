@@ -18,8 +18,12 @@ class TemporalAgent(BaseAgent):
         self.logger.info(f"Dados temporais recebidos. Procurando distorções fractais no tempo...")
         
         if "FractalPattern" in self.skills:
-            # Simula envio de dados históricos do ativo
-            historical = [1, 2, 3, 5, 8, 13] 
+            # Envia dados históricos REAIS do ativo (DataFrame de preços)
+            historical = market_data.get("history")
+            if historical is None:
+                self.logger.warning("Sem dados históricos para análise fractal. Pulando.")
+                return
+            
             fractal_insight = await self.skills["FractalPattern"].execute(historical_data=historical)
             
             # Incorpora os dados originais

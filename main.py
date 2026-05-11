@@ -17,12 +17,14 @@ from agents.tape_reader_agent import TapeReaderAgent
 from skills.killswitch_skills import SystemKillSwitchSkill
 from skills.macro_news_skills import MacroNewsSkill
 from skills.order_flow_skills import LiquidityHeatmapSkill
+from skills.macro_calendar_skill import MacroCalendarSkill
+from skills.tradovate_api_skill import TradovateAPISkill
 
 # Importação de Skills
 from skills.market_skills import MarketDataFetchSkill, StrategyAnalysisSkill
 from skills.advanced_skills import FractalPatternSkill, CrossAssetCorrelationSkill
 from skills.ai_skills import GeminiInferenceSkill
-from skills.execution_skills import BrowserMCPExecutionSkill
+from skills.execution_skills import TradingViewTradovateMCPExecutionSkill
 from skills.smc_technical_skills import SmcTechnicalSkill
 
 logging.basicConfig(
@@ -48,7 +50,7 @@ async def high_frequency_stream_simulator(engine: NexusEngine):
 
 async def main():
     logging.info("==================================================================")
-    logging.info("🌌 NEXUS SINGULARITY ENGINE V15.0: THE 4 CHAIRS NEURAL COMMITTEE")
+    logging.info("🌌 NEXUS SINGULARITY ENGINE V10.0: FASE 2 — AUTONOMOUS EXECUTION")
     logging.info("==================================================================")
 
     engine = NexusEngine()
@@ -72,23 +74,28 @@ async def main():
     fractal_skill = FractalPatternSkill()
     correlation_skill = CrossAssetCorrelationSkill()
     gemini_skill = GeminiInferenceSkill()
-    execution_mcp = BrowserMCPExecutionSkill()
+    execution_mcp = TradingViewTradovateMCPExecutionSkill()
     smc_skill = SmcTechnicalSkill()
     killswitch_skill = SystemKillSwitchSkill()
     macro_news_skill = MacroNewsSkill()
     order_flow_skill = LiquidityHeatmapSkill()
+    macro_calendar_skill = MacroCalendarSkill()
+    tradovate_api_skill = TradovateAPISkill(mode="demo")  # Fase 2: demo first
 
     # 3. Equipa os Agentes com suas Armas (Skills)
     data_ops.equip_skill(fetch_skill)
     macro.equip_skill(macro_news_skill)
+    macro.equip_skill(macro_calendar_skill)  # Fase 3: Calendar blackout
     temporal.equip_skill(fractal_skill)
     oracle.equip_skill(strategy_skill)
     oracle.equip_skill(smc_skill)
     oracle.equip_skill(gemini_skill)
     devops.equip_skill(killswitch_skill)
+    devops.equip_skill(tradovate_api_skill)  # Fase 2: Kill Switch flatten via API
     tape_reader.equip_skill(order_flow_skill)
     quantum.equip_skill(correlation_skill)
     broker.equip_skill(execution_mcp)
+    broker.equip_skill(tradovate_api_skill)  # Fase 2: Dual mode execution
 
     # 4. Acopla o Enxame ao Motor
     for agent in [data_ops, macro, temporal, oracle, devops, tape_reader, quantum, guardian, committee, broker, forensic]:

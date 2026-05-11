@@ -8,9 +8,9 @@ logger = logging.getLogger("RLFeedback")
 
 class ReinforcementLearningSkill(BaseSkill):
     """
-    Skill responsável pelo Feedback Loop Institucional (Reinforcement Learning).
-    Calcula pesos dinâmicos para a aprovação de trades baseando-se no
-    histórico forense de execuções (Kelly Criterion / Win Rate adaptativo).
+    V16.2: Feedback Loop Institucional com PnL REAL.
+    Calcula pesos dinâmicos baseados em win rate real do Guardian singleton.
+    Usa Kelly Criterion adaptativo para ajustar agressividade.
     """
     def __init__(self, db_path: str = "memory_data/telemetry.db"):
         super().__init__(name="ReinforcementLearningSkill", description="Ajuste de Pesos via Feedback Forense")
@@ -18,38 +18,92 @@ class ReinforcementLearningSkill(BaseSkill):
 
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Calcula o modificador de confiança atual baseado na assertividade recente do motor.
+        V16.2: Calcula modificador de confiança usando dados reais.
+        Fontes: Guardian HTTP > live_pnl.json > SQLite fallback
         """
         asset = params.get("asset", "UNKNOWN")
         
-        # Pesos padrão se não houver histórico
         weight_multiplier = 1.0
         historical_trades = 0
+        win_rate = 0.5  # Default neutro
+        daily_pnl = 0.0
+        data_source = "DEFAULT"
         
+        # Prioridade 1: Guardian singleton via HTTP (dados reais)
         try:
-            if os.path.exists(self.db_path):
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
+            import httpx
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                # PnL real
+                pnl_resp = await client.get("http://127.0.0.1:8000/api/pnl")
+                if pnl_resp.status_code == 200:
+                    pnl_data = pnl_resp.json()
+                    daily_pnl = pnl_data.get("pnl", 0.0)
+                    historical_trades = pnl_data.get("trades_today", 0)
+                    data_source = "GUARDIAN_LIVE"
                 
-                # Busca quantas vezes nós operamos este ativo recentemente
-                cursor.execute(f"SELECT COUNT(*) FROM telemetry WHERE asset = '{asset}' AND status = 'EXECUTED_IN_BROKER'")
-                historical_trades = cursor.fetchone()[0]
-                
-                # Numa implementação completa (com webhook de saída da corretora), leríamos a coluna PnL.
-                # Como simulação de RL, vamos aplicar um "Cool-down penalty" se tivermos operado muito esse ativo.
-                if historical_trades > 5:
-                    weight_multiplier = 0.95  # Diminui levemente a agressividade
-                if historical_trades > 10:
-                    weight_multiplier = 0.85  # Overtrading protection
-                
-                conn.close()
-        except Exception as e:
-            logger.warning(f"Erro ao ler telemetry.db para RL Feedback: {e}")
+                # Analytics reais (win rate)
+                analytics_resp = await client.get("http://127.0.0.1:8000/api/analytics/cached")
+                if analytics_resp.status_code == 200:
+                    analytics = analytics_resp.json()
+                    win_rate = analytics.get("win_rate", 0.5)
+        except Exception:
+            pass
+        
+        # Prioridade 2: live_pnl.json (Motor de Agentes)
+        if data_source == "DEFAULT":
+            try:
+                import json as _json
+                pnl_path = os.path.join(os.path.dirname(__file__), "..", "memory_data", "live_pnl.json")
+                if os.path.exists(pnl_path):
+                    with open(pnl_path, "r") as f:
+                        data = _json.load(f)
+                        daily_pnl = data.get("pnl", 0.0)
+                        data_source = "LIVE_PNL_FILE"
+            except Exception:
+                pass
+        
+        # Prioridade 3: SQLite fallback (trade count only)
+        if data_source == "DEFAULT":
+            try:
+                if os.path.exists(self.db_path):
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM telemetry WHERE asset = ? AND status = 'EXECUTED_IN_BROKER'", (asset,))
+                    historical_trades = cursor.fetchone()[0]
+                    conn.close()
+                    data_source = "SQLITE_FALLBACK"
+            except Exception as e:
+                logger.warning(f"Erro ao ler telemetry.db para RL Feedback: {e}")
 
-        logger.info(f"RL Feedback para {asset}: Histórico={historical_trades} trades. Multiplicador de Convicção={weight_multiplier}")
+        # V16.2: Cálculo inteligente do multiplicador
+        # Win Rate > 60% → boost (até 1.15x)
+        # Win Rate < 40% → penalize (até 0.80x)  
+        # Overtrading (>5 trades) → cooldown
+        if win_rate > 0.6:
+            weight_multiplier = min(1.15, 1.0 + (win_rate - 0.6) * 0.5)
+        elif win_rate < 0.4 and win_rate > 0:
+            weight_multiplier = max(0.80, 1.0 - (0.4 - win_rate) * 0.5)
+        
+        # Overtrading protection
+        if historical_trades > 5:
+            weight_multiplier *= 0.90
+        
+        # Loss streak protection (PnL negativo = reduzir exposição)
+        if daily_pnl < -500:
+            weight_multiplier *= 0.75
+            logger.warning(f"RL DANGER: PnL=${daily_pnl:.2f} - Reduzindo exposição para {weight_multiplier:.2f}x")
+
+        logger.info(
+            f"RL Feedback [{data_source}] {asset}: "
+            f"WinRate={win_rate:.1%} | PnL=${daily_pnl:.2f} | "
+            f"Trades={historical_trades} | Multiplier={weight_multiplier:.3f}"
+        )
 
         return {
             "status": "success",
-            "weight_multiplier": weight_multiplier,
-            "historical_trades": historical_trades
+            "weight_multiplier": round(weight_multiplier, 3),
+            "historical_trades": historical_trades,
+            "win_rate": round(win_rate, 3),
+            "daily_pnl": round(daily_pnl, 2),
+            "data_source": data_source
         }

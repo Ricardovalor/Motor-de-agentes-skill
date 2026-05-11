@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   nexus_engine:
     build: .
-    container_name: nexus_singularity_engine_v10
+    container_name: nexus_engine_v16_2
     restart: unless-stopped
     env_file:
       - .env
@@ -13,15 +11,18 @@ services:
       - ./agents:/app/agents
       - ./skills:/app/skills
       - ./core:/app/core
+      - ./config:/app/config
+      - ./tradingview-mcp:/app/tradingview-mcp
       - ./main.py:/app/main.py
+      - ./rules.json:/app/rules.json
     ports:
-      - "8005:8000"
+      - "8005:8005"
     networks:
       - nexus_net
 
   nexus_dashboard:
     build: .
-    container_name: nexus_operational_dashboard
+    container_name: nexus_swarm_dashboard_v16_2
     restart: always
     volumes:
       - ./memory_data:/app/memory_data

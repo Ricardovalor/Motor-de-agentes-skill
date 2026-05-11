@@ -8,10 +8,21 @@ import os
 
 app = FastAPI(title="Nexus Unified Dashboard")
 
+ALLOWED_ORIGINS = [
+    "http://localhost:3030",
+    "http://127.0.0.1:3030",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8005",
+    "http://127.0.0.1:8005",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -24,9 +35,9 @@ def get_telemetry():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # Cria a tabela se não existir (para evitar erros se o dashboard ligar antes do motor)
+        # Cria a tabela de telemetria se não existir (para evitar erros se o dashboard ligar antes do motor)
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS executions (
+            CREATE TABLE IF NOT EXISTS telemetry (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 asset TEXT,
@@ -45,6 +56,31 @@ def get_telemetry():
         return {"status": "success", "data": data}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/pnl")
+def get_pnl():
+    try:
+        pnl_path = os.path.join(os.path.dirname(__file__), "..", "memory_data", "live_pnl.json")
+        if os.path.exists(pnl_path):
+            import json
+            with open(pnl_path, "r") as f:
+                return json.load(f)
+        return {"pnl": 0.0}
+    except Exception as e:
+        return {"pnl": 0.0, "error": str(e)}
+
+@app.get("/api/swarm/consolidated")
+def get_swarm_consolidated():
+    """V16.2: Proxy para /api/swarm/stats do Extratredey Guardian."""
+    import urllib.request
+    try:
+        req = urllib.request.Request("http://host.docker.internal:8000/api/swarm/stats")
+        resp = urllib.request.urlopen(req, timeout=3)
+        import json as _json
+        return _json.loads(resp.read())
+    except Exception:
+        # Fallback: dados locais
+        return {"status": "guardian_offline", "source": "local_dashboard"}
 
 @app.get("/api/network")
 def get_network_nodes():

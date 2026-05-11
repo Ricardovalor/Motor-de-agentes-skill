@@ -24,10 +24,13 @@ class EventBus:
         self._subscribers[topic].append(agent)
 
     async def publish(self, message: Message):
+        """
+        V16.2 FIX: Sequential dispatch — subscribers are processed IN ORDER.
+        This prevents race conditions where ExecutionAgent fires before Guardian validates.
+        """
         if message.topic in self._subscribers:
             for agent in self._subscribers[message.topic]:
-                # Non-blocking event dispatch com tratamento de erros
-                asyncio.create_task(self._safe_handle(agent, message))
+                await self._safe_handle(agent, message)
 
     async def _safe_handle(self, agent, message):
         try:

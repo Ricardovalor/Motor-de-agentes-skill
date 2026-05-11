@@ -17,10 +17,12 @@ class TemporalChronosSkill(BaseSkill):
         # Fuso horário base do mercado de NY (NYSE/CME)
         self.market_tz = pytz.timezone("America/New_York")
         
-        # Definição das Kill Zones (Horários em NY Time - EST/EDT)
+        # Definição das Kill Zones (Horários em NY Time - Alinhado com rules.json)
         self.kill_zones = [
-            {"name": "NY AM Session", "start": datetime.time(9, 30), "end": datetime.time(12, 0)},
-            {"name": "NY PM Session", "start": datetime.time(13, 30), "end": datetime.time(15, 45)}
+            {"name": "LONDON", "start": datetime.time(2, 0), "end": datetime.time(5, 0)},
+            {"name": "NY_OPEN", "start": datetime.time(9, 30), "end": datetime.time(11, 0)},
+            {"name": "MID_DAY", "start": datetime.time(12, 0), "end": datetime.time(13, 30)},
+            {"name": "POWER_HOUR", "start": datetime.time(15, 0), "end": datetime.time(16, 0)}
         ]
 
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:

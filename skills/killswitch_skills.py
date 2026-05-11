@@ -20,12 +20,32 @@ class SystemKillSwitchSkill(BaseSkill):
 
     async def _measure_broker_latency(self) -> float:
         """
-        Simula um ping ICMP na corretora ou websocket de dados.
+        Mede latência real via TCP connect ao WebSocket do Tradovate.
+        Fallback para loopback se rede externa falhar.
         """
-        start_time = time.time()
-        # Aqui pingaríamos de fato os servidores da CME/NinjaTrader
-        await asyncio.sleep(0.015) # Simula um ping normal de 15ms
-        return (time.time() - start_time) * 1000
+        import socket
+        targets = [
+            ("live.tradovate.com", 443),      # Tradovate Live WS
+            ("md.tradovate.com", 443),         # Tradovate Market Data
+            ("127.0.0.1", 9222),               # CDP local (TradingView)
+        ]
+        best_latency = float('inf')
+        for host, port in targets:
+            try:
+                start_time = time.time()
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1.0)
+                sock.connect((host, port))
+                sock.close()
+                latency = (time.time() - start_time) * 1000
+                best_latency = min(best_latency, latency)
+            except (socket.timeout, ConnectionRefusedError, OSError):
+                continue
+        
+        if best_latency == float('inf'):
+            logger.warning("[KillSwitch] Nenhum endpoint acessível — assumindo latência crítica")
+            return 9999.0  # Triggers PANIC
+        return best_latency
 
     async def execute(self, params: Dict[str, Any] = None) -> Dict[str, Any]:
         
