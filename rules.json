@@ -1,7 +1,7 @@
 {
-  "_version": "V10.5-production",
+  "_version": "V16.2-TITAN",
   "_updated": "2026-05-13",
-  "_risk_strategy": "V10.5 PRODUCTION: Merged V9.5+V10.0. All audit fixes applied (persistence bug, OB expiry, commission 0.52, DLL aligned, Micro Trend Guard, Wick Ratio Sweep, Dynamic Quality). Backtester upgraded with Sortino/Calmar/VaR/Kelly + reproducible Monte Carlo.",
+  "_risk_strategy": "V16.2 TITAN HARDENED: 19 institutional fixes applied. EventBus backpressure, SQLite persistent, ChromaDB lock timeout, MemoryBank singleton, SL=0 block, RSS 3-provider chain, aiohttp session pooling. Apex EOD compliant.",
 
   "provider": "APEX",
   "plan": "EOD_50K",

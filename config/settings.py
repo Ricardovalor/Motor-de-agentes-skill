@@ -17,7 +17,7 @@ def _load_rules() -> dict:
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Nexus Singularity Engine"
-    VERSION: str = "10.5.0"  # BUG-H01 FIX: Unificado com rules.json V10.5-production
+    VERSION: str = "16.2.0"  # TITAN Hardened — synced with rules.json
     ENVIRONMENT: str = "development"
     
     # Parâmetros Institucionais Apex (V16.2 — Alinhados com rules.json)

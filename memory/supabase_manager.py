@@ -26,7 +26,7 @@ class SupabaseManager:
         if self.url and self.key and not self.key.endswith("(insira_a_sua_service_role_key_aqui)"):
             try:
                 self.client = create_client(self.url, self.key)
-                logger.info("✅ Conexão com Supabase Cloud estabelecida (Nexus Zenith V10.5 Schema).")
+                logger.info("✅ Conexão com Supabase Cloud estabelecida (Nexus Zenith V16.2 TITAN Schema).")
             except Exception as e:
                 logger.error(f"❌ Erro ao conectar com Supabase: {e}")
         else:
@@ -74,7 +74,7 @@ class SupabaseManager:
                 def _insert_pipeline():
                     self.client.table('pipeline_log').insert({
                         "pipeline_id": pipeline_id,
-                        "session_id": "nexus_zenith_v10.5",
+                        "session_id": "nexus_zenith_v16.2",
                         "ticker": asset,
                         "action": mapped_action,
                         "approved": approved,

@@ -65,7 +65,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="get_swarm_status",
-            description="Retorna um diagnóstico de saúde de todos os 12 Agentes do motor Nexus V10.5.",
+            description="Retorna um diagnóstico de saúde de todos os 12 Agentes do motor Nexus V16.2.",
             inputSchema={
                 "type": "object",
                 "properties": {}
@@ -115,7 +115,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         return [
             types.TextContent(
                 type="text",
-                text="Status do Swarm: ONLINE. 12 Agentes Ativos (V10.5-production). Guardian-Protocol = SINGLETON (Apex Rules). BrokerSync = ATIVO (PnL/Trailing). Conexão CDP = PORTA 9222. Webhook = PORTA 8005."
+                text="Status do Swarm: ONLINE. 12 Agentes Ativos (V16.2-TITAN). Guardian-Protocol = SINGLETON (Apex Rules). BrokerSync = ATIVO (PnL/Trailing). Conexão CDP = PORTA 9222. Webhook = PORTA 8005."
             )
         ]
     raise ValueError(f"Tool not found: {name}")

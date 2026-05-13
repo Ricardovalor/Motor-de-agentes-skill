@@ -92,7 +92,7 @@ async def health_check():
     agent_count = len(_engine_ref.agents) if _engine_ref else 0
     return {
         "status": "ONLINE",
-        "engine_version": "V10.5-production",
+        "engine_version": "V16.2-TITAN",
         "agents_registered": agent_count,
         "engine_running": _engine_ref.running if _engine_ref else False,
     }
@@ -124,7 +124,7 @@ async def main():
     global _engine_ref
 
     logging.info("==================================================================")
-    logging.info("🌌 NEXUS ZENITH ENGINE V10.5: INSTITUTIONAL PRODUCTION HARDENED")
+    logging.info("🌌 NEXUS ZENITH ENGINE V16.2: TITAN HARDENED")
     logging.info("==================================================================")
 
     engine = NexusEngine()
