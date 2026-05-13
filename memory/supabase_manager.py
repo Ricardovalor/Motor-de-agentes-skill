@@ -85,7 +85,7 @@ class SupabaseManager:
                         "pattern": raw_data.get("fvg_type", "UNKNOWN"),
                         "quality_score": quality_score,
                         "stages_json": raw_data,
-                        "version": "10.5.0",
+                        "version": "16.2.0",
                         # V10.0 fields
                         "micro_trend": raw_data.get("micro_trend", "ALIGNED"),
                         "sweep_confirmed": raw_data.get("sweep_confirmed", False),

@@ -43,7 +43,7 @@ logging.basicConfig(
 # BUG-C02 FIX: FastAPI Webhook Server (antes não existia — sinais do
 # TradingView e test_injection.py caíam no vácuo)
 # =========================================================================
-webhook_app = FastAPI(title="Nexus Zenith Webhook Receiver", version="10.5.0")
+webhook_app = FastAPI(title="Nexus Zenith Webhook Receiver", version="16.2.0")
 
 # Referência global ao engine para o webhook injetar sinais
 _engine_ref: NexusEngine = None
