@@ -84,10 +84,12 @@ async def run_backtest():
         signal = None
         fvg_type = "UNKNOWN"
         
-        if rsi < 45:
+        # GAP-M03 FIX: Alinhado com StrategyAnalysisSkill real (RSI<30/RSI>70)
+        # Antes usava 45/55, gerando centenas de sinais falsos
+        if rsi < 30:
             signal = "LONG"
             fvg_type = "BULLISH_H4"
-        elif rsi > 55:
+        elif rsi > 70:
             signal = "SHORT"
             fvg_type = "BEARISH_H4"
             

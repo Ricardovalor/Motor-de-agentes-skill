@@ -44,19 +44,43 @@ class TemporalChronosSkill(BaseSkill):
         
         in_kill_zone = False
         active_zone = "Fora de Kill Zone"
+        min_distance_minutes = float('inf')
         
         for zone in self.kill_zones:
             if zone["start"] <= ny_time <= zone["end"]:
                 in_kill_zone = True
                 active_zone = zone["name"]
+                min_distance_minutes = 0
                 break
+            else:
+                # Calcula distância em minutos para a Kill Zone mais próxima
+                now_mins = ny_time.hour * 60 + ny_time.minute
+                start_mins = zone["start"].hour * 60 + zone["start"].minute
+                end_mins = zone["end"].hour * 60 + zone["end"].minute
+                dist = min(abs(now_mins - start_mins), abs(now_mins - end_mins))
+                min_distance_minutes = min(min_distance_minutes, dist)
                 
-        logger.info(f"Avaliação Temporal: {ny_time.strftime('%H:%M')} NY -> {active_zone}")
+        # BUG-H02 FIX: Penalidade graduada em vez de 0.5 absoluto
+        # Dentro da KZ: 0 penalidade
+        # Até 30 min fora: 0.08 (marginal)
+        # Até 60 min fora: 0.12 (moderada)
+        # Mais de 60 min fora: 0.15 (máxima)
+        if in_kill_zone:
+            penalty = 0.0
+        elif min_distance_minutes <= 30:
+            penalty = 0.08
+        elif min_distance_minutes <= 60:
+            penalty = 0.12
+        else:
+            penalty = 0.15
+                
+        logger.info(f"Avaliação Temporal: {ny_time.strftime('%H:%M')} NY -> {active_zone} | Distância KZ: {min_distance_minutes:.0f}min | Penalidade: {penalty}")
 
         return {
             "status": "success",
             "in_kill_zone": in_kill_zone,
             "active_zone": active_zone,
             "ny_time": ny_time.strftime("%H:%M"),
-            "confidence_penalty": 0 if in_kill_zone else 0.5 # Corta a confiança pela metade se operar fora do horário
+            "distance_to_kz_minutes": min_distance_minutes,
+            "confidence_penalty": penalty
         }

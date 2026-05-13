@@ -46,18 +46,45 @@ class TradovateAPISkill(BaseSkill):
     DEMO_WS = "wss://demo.tradovate.com/v1/websocket"
     LIVE_WS = "wss://live.tradovate.com/v1/websocket"
     
-    # Mapeamento de símbolos Pine → Tradovate
-    SYMBOL_MAP = {
-        "MNQ1!": "MNQM6",  # Micro E-mini Nasdaq (ajustar mês/ano conforme contrato ativo)
-        "MGC1!": "MGCM6",  # Micro Gold
-        "MNQ": "MNQM6",
-        "MGC": "MGCM6",
-    }
+    # MED-02 FIX: Mapeamento dinâmico de símbolos Pine → Tradovate
+    # Lê do .env para evitar quebra no rollover trimestral (H/M/U/Z)
+    # Fallback: calcula automaticamente baseado na data atual
+    @staticmethod
+    def _current_contract_suffix() -> str:
+        """Calcula sufixo do contrato ativo baseado no mês atual (CME quarterly)."""
+        import datetime
+        now = datetime.datetime.now()
+        month = now.month
+        year = str(now.year)[-1]  # Último dígito do ano
+        # CME months: H=Mar, M=Jun, U=Sep, Z=Dec
+        # O contrato ativo muda ~2 semanas antes do vencimento
+        if month <= 3:
+            return f"H{year}"
+        elif month <= 6:
+            return f"M{year}"
+        elif month <= 9:
+            return f"U{year}"
+        else:
+            return f"Z{year}"
+    
+    @property
+    def SYMBOL_MAP(self) -> dict:
+        suffix = os.getenv("TRADOVATE_CONTRACT_SUFFIX", self._current_contract_suffix())
+        return {
+            "MNQ1!": f"MNQ{suffix}",
+            "MGC1!": f"MGC{suffix}",
+            "MNQ": f"MNQ{suffix}",
+            "MGC": f"MGC{suffix}",
+            "MES": f"MES{suffix}",
+            "M6E": f"M6E{suffix}",
+        }
     
     # Tick size por ativo (para validação de preço)
     TICK_PARAMS = {
         "MNQ": {"tick_size": 0.25, "tick_value": 0.50, "min_ticks_sl": 20},
         "MGC": {"tick_size": 0.10, "tick_value": 1.00, "min_ticks_sl": 15},
+        "MES": {"tick_size": 0.25, "tick_value": 1.25, "min_ticks_sl": 16},  # MED-01 FIX
+        "M6E": {"tick_size": 0.0001, "tick_value": 1.25, "min_ticks_sl": 20},  # MED-01 FIX
     }
 
     def __init__(self, mode: str = "demo"):
@@ -85,7 +112,25 @@ class TradovateAPISkill(BaseSkill):
         self._last_order_time: float = 0
         self._min_order_interval: float = 1.0  # Min 1s between orders (anti-bot)
         
+        # TITAN-014 FIX: Sessão HTTP persistente (reutiliza conexão TCP + TLS)
+        self._session: aiohttp.ClientSession = None
+        
         logger.info(f"TradovateAPISkill initialized in {mode.upper()} mode → {self.base_url}")
+    
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """TITAN-014: Retorna sessão persistente, criando se necessário."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=10),
+                headers={"Accept": "application/json"}
+            )
+        return self._session
+    
+    async def close(self):
+        """TITAN-014: Cleanup da sessão persistente (chamado no shutdown)."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            logger.info("TradovateAPI session fechada.")
 
     # =====================================================================
     # AUTHENTICATION
@@ -155,34 +200,32 @@ class TradovateAPISkill(BaseSkill):
     # =====================================================================
     
     async def _api_get(self, endpoint: str) -> Optional[Any]:
-        """GET request com auth header."""
+        """GET request com auth header. TITAN-014: Usa sessão persistente."""
         url = f"{self.base_url}{endpoint}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=self._headers(), 
-                                       timeout=aiohttp.ClientTimeout(total=8)) as resp:
-                    if resp.status == 200:
-                        return await resp.json()
-                    else:
-                        logger.warning(f"GET {endpoint} → {resp.status}")
-                        return None
+            session = await self._get_session()
+            async with session.get(url, headers=self._headers()) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    logger.warning(f"GET {endpoint} → {resp.status}")
+                    return None
         except Exception as e:
             logger.error(f"GET {endpoint} Exception: {e}")
             return None
     
     async def _api_post(self, endpoint: str, payload: dict) -> Optional[dict]:
-        """POST request com auth header."""
+        """POST request com auth header. TITAN-014: Usa sessão persistente."""
         url = f"{self.base_url}{endpoint}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=self._headers(), json=payload,
-                                        timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    data = await resp.json()
-                    if resp.status in (200, 201):
-                        return data
-                    else:
-                        logger.error(f"POST {endpoint} → {resp.status}: {data}")
-                        return {"error": True, "status": resp.status, "detail": data}
+            session = await self._get_session()
+            async with session.post(url, headers=self._headers(), json=payload) as resp:
+                data = await resp.json()
+                if resp.status in (200, 201):
+                    return data
+                else:
+                    logger.error(f"POST {endpoint} → {resp.status}: {data}")
+                    return {"error": True, "status": resp.status, "detail": data}
         except Exception as e:
             logger.error(f"POST {endpoint} Exception: {e}")
             return {"error": True, "detail": str(e)}

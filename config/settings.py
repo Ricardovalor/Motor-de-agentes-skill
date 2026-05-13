@@ -1,9 +1,23 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Dict, Any
+import json
+import os
+
+def _load_rules() -> dict:
+    """Carrega rules.json como fonte única de verdade para parâmetros Apex."""
+    rules_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "rules.json"),
+        "rules.json",
+    ]
+    for path in rules_paths:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    return {}
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Nexus Singularity Engine"
-    VERSION: str = "16.2.0"
+    VERSION: str = "10.5.0"  # BUG-H01 FIX: Unificado com rules.json V10.5-production
     ENVIRONMENT: str = "development"
     
     # Parâmetros Institucionais Apex (V16.2 — Alinhados com rules.json)
@@ -18,8 +32,11 @@ class Settings(BaseSettings):
     GUARDIAN_STRICT_MODE: bool = True
     
     # Persistência
-    SQLITE_DB_PATH: str = "sqlite:///telemetry.db"
-    CHROMA_DB_PATH: str = "./chroma_data"
+    SQLITE_DB_PATH: str = "sqlite:///memory_data/telemetry.db"  # TITAN-013 FIX: Unificado com StateMemory path
+    CHROMA_DB_PATH: str = "./memory_data/chroma_data"  # GAP-M05 FIX: Unificado com VectorMemory default
+    
+    # GAP-F09 FIX: Declaração explícita para o Pydantic V2 aceitar a injeção
+    RULES: Dict[str, Any] = {}
     
     class Config:
         env_file = ".env"
@@ -28,3 +45,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# BUG-C04 FIX: Carrega rules.json como dict acessível via settings.RULES
+# Usado por: committee_agent (SL/TP), guardian_agent (DLL), compliance_skills
+settings.RULES = _load_rules()

@@ -186,7 +186,9 @@ class MacroCalendarSkill(BaseSkill):
             }
         """
         if now is None:
-            now = datetime.now()
+            # GAP-M01 FIX: Usa timezone de NY para alinhamento com horários do ForexFactory
+            import pytz
+            now = datetime.now(pytz.timezone("America/New_York"))
         
         for event in events:
             event_dt = self._parse_event_datetime(event)

@@ -1,12 +1,14 @@
 {
-  "_version": "V10.0-production",
-  "_updated": "2026-05-11",
-  "_risk_strategy": "V10.0 PRODUCTION: MNQ SL 2.5x ATR (anti-sweep), MGC SL 1.2x (R:R fix), micro-trend guard, dynamic QS, sweep confirmation. Audited by Senior Chief Analyst.",
+  "_version": "V10.5-production",
+  "_updated": "2026-05-13",
+  "_risk_strategy": "V10.5 PRODUCTION: Merged V9.5+V10.0. All audit fixes applied (persistence bug, OB expiry, commission 0.52, DLL aligned, Micro Trend Guard, Wick Ratio Sweep, Dynamic Quality). Backtester upgraded with Sortino/Calmar/VaR/Kelly + reproducible Monte Carlo.",
 
   "provider": "APEX",
   "plan": "EOD_50K",
   "phase": "EVALUATION",
   "broker": "TRADOVATE",
+  "model_type": "EOD",
+  "model_note": "EOD = new model (50% consistency, scaling tiers, 6 payouts). LEGACY = old model (30% consistency, fixed contracts, 8-day cycles). Check your Apex dashboard to confirm which model your PA uses.",
 
   "account_type": "APEX_50K",
   "account_size": 50000,
@@ -38,6 +40,8 @@
   },
 
   "max_daily_trades": 3,
+  "min_confidence_score": 40,
+  "min_confidence_note": "Pine QS × 10 = webhook score. MGC min_quality=4.0 → score 40. MNQ min_quality=5.5 → score 55. Guardian rejects below this.",
   "risk_per_trade_percent": 1,
   "max_risk_reward_ratio": 5,
   "safety_net_offset": 100,
@@ -46,7 +50,7 @@
     "enabled_in_evaluation": false,
     "enabled_in_pa": true,
     "max_single_day_percent": 50,
-    "note": "No single day can exceed 50% of total profit. Only applies in PA phase."
+    "note": "No single day can exceed 50% of total profit at payout request. Apex official TOS confirmed May 2026. Calculation: biggest_day / 0.5 = min_required_net_profit."
   },
 
   "evaluation_rules": {
@@ -66,19 +70,111 @@
   },
 
   "pa_rules": {
-    "max_contracts_mini": 4,
-    "max_contracts_micro": 40,
     "consistency_rule_percent": 50,
     "scaling_enabled": true,
     "max_drawdown": 2000,
     "drawdown_type": "EOD",
-    "daily_loss_limit": 1000,
-    "payout_frequency_days": 5,
+    "eod_trailing_stops_at": 50100,
+    "eod_trailing_note": "Tradovate: EOD drawdown NEVER stops trailing. PA stops at initial+$100 ($50,100).",
     "max_accounts": 20,
     "safety_net": true,
-    "safety_net_threshold": 100,
+    "safety_net_threshold": 52100,
+    "safety_net_note": "Balance must stay above $52,100 (initial + drawdown + $100). Only profit ABOVE this is withdrawable.",
+    "min_balance_for_payout": 52600,
+    "min_payout_amount": 500,
+    "profit_split": 100,
+    "profit_split_note": "100% profit split on ALL payouts (no 90/10 anymore as of 2026 TOS).",
+    "max_lifetime_payouts": 6,
+
+    "payout_eligibility": {
+      "min_qualifying_days": 5,
+      "min_daily_profit_qualifying": 250,
+      "qualifying_note": "Each qualifying day must have >= $250 net profit for 50K account. Days don't need to be consecutive."
+    },
+
+    "payout_caps_per_number": {
+      "1": 1500,
+      "2": 1500,
+      "3": 2000,
+      "4": 2500,
+      "5": 2500,
+      "6": 3000,
+      "note": "Max payout per request number. After 6 payouts, PA is closed. Total max extractable: $13,000."
+    },
+
+    "scaling_tiers_50k": {
+      "level_1": { "profit_range_min": 0,    "profit_range_max": 1499,  "max_contracts": 2, "daily_loss_limit": 1000 },
+      "level_2": { "profit_range_min": 1500, "profit_range_max": 2999,  "max_contracts": 3, "daily_loss_limit": 1000 },
+      "level_3": { "profit_range_min": 3000, "profit_range_max": 5999,  "max_contracts": 4, "daily_loss_limit": 2000 },
+      "level_4": { "profit_range_min": 6000, "profit_range_max": 999999, "max_contracts": 4, "daily_loss_limit": 3000 },
+      "note": "Tier determined by EOD closing balance profit. Updated BEFORE next session. Starts at Level 1 (2 contracts)."
+    }
+  },
+
+  "legacy_pa_rules": {
+    "_applies_to": "Accounts created under legacy model. Check Apex dashboard to confirm.",
+    "consistency_rule_percent": 30,
+    "consistency_note": "Legacy uses 30% windfall rule. biggest_day / 0.3 = min_required_net_profit.",
+    "min_trading_days": 8,
+    "min_profit_days": 5,
+    "min_daily_profit_qualifying": 50,
     "profit_split_first_25k": 100,
-    "profit_split_after_25k": 90
+    "profit_split_after_25k": 90,
+    "profit_split_note": "Legacy: 100% of first $25K per PA, then 90/10 split. After 5th payout = 100% always.",
+    "safety_net_applies": "first_3_payouts_only",
+    "scaling_tiers": false,
+    "max_contracts_mini_50k": 10,
+    "max_drawdown": 2500,
+    "drawdown_type": "TRAILING",
+    "trailing_note": "Legacy trailing drawdown is REAL-TIME (not EOD). Trails highest unrealized balance.",
+    "payout_caps": {
+      "1_to_5": 2000,
+      "6_plus": "NO_CAP",
+      "note": "Legacy: max $2,000 per payout for first 5. After 5th = unlimited. No lifetime payout cap."
+    }
+  },
+
+  "tradovate_platform": {
+    "api_limits": {
+      "max_actions_per_hour": 5000,
+      "max_contracts_per_order": 100,
+      "mobile_max_accounts_visible": 5,
+      "actions_note": "Place/modify/cancel each count as 1 action. Group trading: each account = separate action. Exceeding = account locked.",
+      "reset_contact": "support@tradovate.com with subject 'Conta Apex – Solicitar Redefinição de Limite'"
+    },
+    "group_trading": {
+      "enabled": true,
+      "name": "Tradovate Copy Trader",
+      "max_accounts_per_group": 20,
+      "setup": "Settings > Add-ons > Group Trading > Create Group > Drag accounts",
+      "restrictions": [
+        "NO bracket/ATM orders in group mode",
+        "NOT available inside TradingView (Tradovate platform only)",
+        "Qty must be multiple of total contracts in group",
+        "Must select GROUP when flattening (not individual account)"
+      ],
+      "note": "CRITICAL for multi-account scaling. Use Tradovate native group trading instead of separate CDP instances."
+    },
+    "commissions_per_side": {
+      "MNQ": { "symbol": "MNQ", "exchange": "CME", "per_side": 0.52, "round_trip": 1.04 },
+      "MGC": { "symbol": "MGC", "exchange": "CME", "per_side": 0.52, "round_trip": 1.04 },
+      "MES": { "symbol": "MES", "exchange": "CME", "per_side": 0.52, "round_trip": 1.04 },
+      "NQ":  { "symbol": "NQ",  "exchange": "CME", "per_side": 1.55, "round_trip": 3.10 },
+      "ES":  { "symbol": "ES",  "exchange": "CME", "per_side": 1.55, "round_trip": 3.10 },
+      "MCL": { "symbol": "MCL", "exchange": "NYMEX", "per_side": 0.67, "round_trip": 1.34 },
+      "note": "Commissions deducted automatically from balance at trade time. Net PnL = Gross - Commissions."
+    },
+    "tradingview_addon": {
+      "cost": "FREE (included with Tradovate subscription)",
+      "data_delay": "5 seconds on free addon",
+      "continuous_data": "Requires TradingView paid subscription",
+      "activation": "Settings > Add-ons > TradingView > Activate > Logout > Login"
+    },
+    "data_subscriptions": {
+      "level_2_cme": { "monthly_cost": 48, "note": "CME Depth of Market. Optional." },
+      "level_2_eurex": { "monthly_cost": 23, "note": "EUREX DOM. Optional." },
+      "order_flow_plus": { "monthly_cost": 0, "note": "VWAP, TPO, Cumulative Delta. Free addon." }
+    }
   },
 
   "asset_profiles": {
@@ -173,7 +269,18 @@
     "hold_past_close": true,
     "exceed_contract_limits": true,
     "use_full_size_without_scaling": true,
-    "automation_without_manual_confirmation": true
+    "share_account_credentials": true,
+    "share_ip_mac_between_traders": true,
+    "vpn_proxy_cloud_to_hide_identity": true,
+    "vpn_note": "VPNs/proxies/cloud to HIDE identity are banned. VPS for legitimate trading from static IP is allowed if not masking location.",
+    "hft_or_exploitative_strategies": true,
+    "automation_algorithms_for_rewards": true,
+    "automation_note": "CRITICAL: Apex TOS states 'Não é permitido o uso de automação ou algoritmos: as recompensas visam reconhecer traders humanos'. System must operate as DECISION SUPPORT, not full auto-execution. Human confirmation required.",
+    "high_risk_asymmetric_rr": true,
+    "high_risk_note": "Small TP with huge SL (e.g. 5 tick TP / 150 tick SL) is banned as 'unacceptable risk management'.",
+    "use_trailing_as_stoploss": true,
+    "account_stacking_burn": true,
+    "multiple_user_accounts": true
   },
 
   "kill_zone_definitions": {

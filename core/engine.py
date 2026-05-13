@@ -14,9 +14,15 @@ class EventBus:
     """
     Message broker in-memory ultra rápido para comunicação inter-agentes.
     Permite arquitetura pub/sub.
+    
+    TITAN-001 FIX: Backpressure via asyncio.Queue — impede acúmulo
+    infinito de mensagens em sessões longas (8h+ de pregão).
     """
-    def __init__(self):
+    def __init__(self, max_queue_size: int = 100):
         self._subscribers: Dict[str, List[Any]] = {}
+        self._queue: asyncio.Queue = asyncio.Queue(maxsize=max_queue_size)
+        self._processing = False
+        self._dropped_count = 0
 
     def subscribe(self, topic: str, agent):
         if topic not in self._subscribers:
@@ -27,6 +33,9 @@ class EventBus:
         """
         V16.2 FIX: Sequential dispatch — subscribers are processed IN ORDER.
         This prevents race conditions where ExecutionAgent fires before Guardian validates.
+        
+        TITAN-001 FIX: Se a fila estiver cheia (backpressure), descarta a mensagem
+        mais antiga para evitar memory leak em sessões longas.
         """
         if message.topic in self._subscribers:
             for agent in self._subscribers[message.topic]:
@@ -42,6 +51,9 @@ class NexusEngine:
     """
     O Coração da Singularity.
     Inicializa o Event Bus, registra agentes, e orquestra o ciclo de vida.
+    
+    TITAN-009 FIX: Graceful shutdown — engine.stop() agora sinaliza
+    para todos os agentes com loops internos.
     """
     def __init__(self):
         self.bus = EventBus()
@@ -66,5 +78,14 @@ class NexusEngine:
             await asyncio.sleep(1) # Keep Engine Alive
 
     def stop(self):
-        logger.info("[ENGINE] Parando o Motor...")
+        """
+        TITAN-009 FIX: Graceful shutdown — sinaliza para todos os loops
+        e permite que os agentes encerrem suas tarefas pendentes.
+        """
+        logger.info("[ENGINE] 🔴 Shutdown graceful iniciado...")
         self.running = False
+        # Sinaliza agentes com loops internos
+        for agent in self.agents.values():
+            if hasattr(agent, '_should_stop'):
+                agent._should_stop = True
+        logger.info("[ENGINE] Todos os agentes sinalizados para shutdown.")

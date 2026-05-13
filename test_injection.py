@@ -1,34 +1,54 @@
-import urllib.request
+import requests
 import json
+import time
+import sys
+import io
 
-def disparar_sinal(asset="MNQ", signal="LONG", price=19500):
-    print(f"🚀 Iniciando teste de injeção na mesa HFT - Ativo: {asset} | Sinal: {signal}")
-    url = "http://127.0.0.1:8000/webhook/tradingview" # Executando de dentro do mesmo container/host (porta real Python)
-    
-    # Se bater no Docker do lado de fora, a porta mapeada é 8005
-    # Tenta 8000 (se tiver rodando `python main.py` puro) e 8005 (se tiver no Docker)
-    payload = json.dumps({
-        "asset": asset, 
-        "signal": signal, 
-        "price": price,
-        "fvg_detected": True,
-        "fvg_type": "BULLISH_H4"
-    }).encode('utf-8')
-    
-    success = False
-    for port in [8000, 8005]:
-        try:
-            req = urllib.request.Request(f"http://127.0.0.1:{port}/webhook/tradingview", data=payload, headers={'Content-Type': 'application/json'})
-            response = urllib.request.urlopen(req, timeout=3)
-            data = response.read().decode('utf-8')
-            print(f"✅ Sucesso na Porta {port}! Motor Nexus Recebeu o Sinal: {data}")
-            success = True
-            break
-        except Exception as e:
-            pass
+# TITAN-015 FIX: Força UTF-8 no stdout para evitar UnicodeEncodeError
+# no terminal Windows (cp1252 não suporta emojis)
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-    if not success:
-        print("❌ FALHA! Certifique-se que o motor está rodando via 'python main.py' ou 'docker-compose up'.")
+def inject_signal(asset, signal, price):
+    url = "http://localhost:8005/webhook/tradingview"
+    
+    payload = {
+        "asset": asset,
+        "signal": signal,
+        "price": price
+    }
+    
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    print(f"[INJECTOR] Disparando Sinal {signal} no {asset} a ${price}...")
+    
+    try:
+        start_time = time.time()
+        response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=30)
+        end_time = time.time()
+        
+        latency = round((end_time - start_time) * 1000, 2)
+        
+        if response.status_code == 200:
+            print(f"[SUCESSO] Roteamento concluido! O Motor engoliu a ordem em {latency}ms.")
+            print(f"[RESPOSTA] {response.json()}")
+        else:
+            print(f"[ERRO] O Motor recusou o pacote HTTP: {response.status_code}")
+            print(f"Detalhes: {response.text}")
+            
+    except requests.exceptions.ConnectionError:
+        print("[FALHA] O Motor parece estar offline. Voce esqueceu de rodar 'py main.py'?")
+    except Exception as e:
+        print(f"[ERRO INTERNO] {e}")
 
 if __name__ == "__main__":
-    disparar_sinal(asset="MNQ", signal="LONG", price=19850.50)
+    print("=========================================================")
+    print("      Nexus Zenith - TradingView Webhook Injector        ")
+    print("=========================================================")
+    
+    inject_signal(asset="MES", signal="LONG", price=5042.25)
+    
+    print("=========================================================")
+    print("Injecao concluida. Verifique a tela do Motor para os logs.")

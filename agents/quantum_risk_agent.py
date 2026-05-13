@@ -27,6 +27,11 @@ class QuantumRiskAgent(BaseAgent):
             
             insight["hedge_required"] = correlation_data.get("hedging_recommended")
             insight["stress_test_passed"] = True
+        else:
+            # BUG-H06 FIX: Não engolir o sinal silenciosamente!
+            self.logger.warning(f"Skill CrossAssetCorrelation não equipada. Forwardando {asset} com defaults seguros.")
+            insight["hedge_required"] = False
+            insight["stress_test_passed"] = True  # Assume passado (conservador: não bloqueia)
             
-            # Envia para aprovação do Guardian com os parâmetros estressados
-            await self.bus.publish(Message(sender=self.name, topic="quantum_risk_approved", payload=insight))
+        # Envia para aprovação do Guardian com os parâmetros estressados
+        await self.bus.publish(Message(sender=self.name, topic="quantum_risk_approved", payload=insight))

@@ -27,9 +27,17 @@ class CommitteeAgent(BaseAgent):
         temporal_eval = await self.temporal_skill.execute(insight)
         
         if not temporal_eval["in_kill_zone"]:
-            # Corta a confiança se operar fora do horário
-            insight["confidence"] -= temporal_eval["confidence_penalty"]
-            self.logger.warning(f"Atenção: Ativo {insight.get('asset')} avaliado fora da Kill Zone ({temporal_eval['ny_time']} NY). Confiança reduzida para {insight.get('confidence'):.2f}")
+            # GAP-M07 FIX: Modelo MULTIPLICATIVO (alinhado com RL Feedback)
+            # Antes era SUBTRATIVO: confidence -= 0.5 (brutal, inconsistente)
+            # Agora: confidence *= (1 - penalty) → proporcional e previsível
+            penalty = temporal_eval["confidence_penalty"]
+            old_confidence = insight["confidence"]
+            insight["confidence"] *= (1.0 - penalty)
+            self.logger.warning(
+                f"Atenção: Ativo {insight.get('asset')} fora da Kill Zone "
+                f"({temporal_eval['ny_time']} NY, dist={temporal_eval.get('distance_to_kz_minutes', '?')}min). "
+                f"Confiança: {old_confidence:.2f} → {insight['confidence']:.2f} (×{1-penalty:.2f})"
+            )
             
             # Se a confiança cair muito, o comitê derruba o trade
             if insight["confidence"] < 0.5:
@@ -89,11 +97,41 @@ class CommitteeAgent(BaseAgent):
         insight["committee_votes"] = votes
 
         # 4. O Committee adiciona os parâmetros finais de risk/reward institucionais
+        # BUG-H07 FIX: Calcula SL/TP prices reais para modo API (antes ia sl_price=0, tp_price=0)
+        entry_price = insight.get("price", 0.0)
+        atr_value = insight.get("atr", 0.0)
+        asset_name = insight.get("asset", "MNQ")
+        
+        # Lê multiplicadores do rules.json via settings
+        sl_mult = settings.RULES.get("asset_profiles", {}).get(asset_name, {}).get("sl_multiplier", 2.5)
+        tp1_mult = settings.RULES.get("asset_profiles", {}).get(asset_name, {}).get("tp1_multiplier", 2.0)
+        
+        if entry_price > 0 and atr_value > 0:
+            if insight.get("signal") == "LONG":
+                sl_price = round(entry_price - (atr_value * sl_mult), 2)
+                tp_price = round(entry_price + (atr_value * tp1_mult), 2)
+            else:
+                sl_price = round(entry_price + (atr_value * sl_mult), 2)
+                tp_price = round(entry_price - (atr_value * tp1_mult), 2)
+        else:
+            # TITAN-005 FIX: NUNCA enviar ordem sem SL — violação Apex direta
+            self.logger.error(
+                f"🚫 TITAN-005: Entry/ATR indisponíveis ({entry_price}/{atr_value}). "
+                f"Ordem para {asset_name} BLOQUEADA — impossível calcular SL/TP seguro."
+            )
+            insight["status"] = "REJECTED_BY_COMMITTEE"
+            insight["rejection_reason"] = "SL_PRICE_ZERO_UNSAFE: ATR ou Entry Price ausentes"
+            await self.bus.publish(Message(sender=self.name, topic="action_rejected", payload=insight))
+            return
+
         verdict = {
             "status": "EXECUTE",
-            "asset": insight.get("asset"),
+            "asset": asset_name,
             "signal": insight.get("signal"),
             "confidence": insight.get("confidence"),
+            "entry_price": entry_price,
+            "sl_price": sl_price,
+            "tp_price": tp_price,
             "target_take_profit": settings.RISK_REWARD_RATIO,
             "max_drawdown": settings.MAX_DRAWDOWN_PERCENT,
             "kill_zone_status": temporal_eval["active_zone"],

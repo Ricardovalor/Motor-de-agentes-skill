@@ -6,6 +6,7 @@ import yfinance as yf
 import os
 import json
 import subprocess
+import pandas as pd
 
 class MarketDataFetchSkill(BaseSkill):
     """
@@ -68,7 +69,6 @@ class MarketDataFetchSkill(BaseSkill):
         if tv_data:
             self.logger.info(f"[INSTITUCIONAL] Sucesso ao extrair dados físicos L2 do TradingView: {tv_data.get('close', 'N/A')}")
             # Emula o history do yfinance usando dados estáticos apenas para não quebrar a TA lib (fallback visual)
-            import pandas as pd
             dates = pd.date_range(end=pd.Timestamp.now(), periods=50, freq='H')
             base_price = float(tv_data.get("close", 15000))
             df = pd.DataFrame({"Close": [base_price]*50, "Volume": [tv_data.get("volume", 100)]*50}, index=dates)
@@ -119,7 +119,6 @@ class MarketDataFetchSkill(BaseSkill):
             "source": "Yahoo_Finance_Fallback"
         }
 
-import pandas as pd
 from ta.momentum import RSIIndicator
 from ta.trend import EMAIndicator
 
@@ -160,18 +159,27 @@ class StrategyAnalysisSkill(BaseSkill):
             signal = "NEUTRAL"
             confidence = 0.5
             
-            if rsi_14 < 30 and current_price > ema_50:
+            # BUG-H02 FIX: RSI 30/70 era restritivo demais — em bull run NQ, RSI raramente < 30
+            # Novo modelo: RSI 40/60 + confluência EMA = sinais operacionais reais
+            if rsi_14 < 20:
                 signal = "LONG"
-                confidence = 0.85 + (30 - rsi_14)/100 # Aumenta convicção quanto mais sobrevendido
-            elif rsi_14 > 70 and current_price < ema_50:
-                signal = "SHORT"
-                confidence = 0.85 + (rsi_14 - 70)/100 # Aumenta convicção quanto mais sobrecomprado
+                confidence = 0.92  # Extremo oversold — convicção máxima
             elif rsi_14 > 80:
                 signal = "SHORT"
-                confidence = 0.90
-            elif rsi_14 < 20:
+                confidence = 0.92  # Extremo overbought — convicção máxima
+            elif rsi_14 < 40 and current_price > ema_50:
                 signal = "LONG"
-                confidence = 0.90
+                confidence = 0.75 + (40 - rsi_14) / 100  # 0.75-0.95
+            elif rsi_14 > 60 and current_price < ema_50:
+                signal = "SHORT"
+                confidence = 0.75 + (rsi_14 - 60) / 100  # 0.75-0.95
+            elif rsi_14 < 45 and current_price > ema_50:
+                # Zona intermediária — sinal com convicção moderada
+                signal = "LONG"
+                confidence = 0.60
+            elif rsi_14 > 55 and current_price < ema_50:
+                signal = "SHORT"
+                confidence = 0.60
             else:
                 signal = "NEUTRAL"
                 confidence = 0.50

@@ -40,4 +40,7 @@ class TapeReaderAgent(BaseAgent):
             # Se sobreviveu à fita, manda para o risco Quant
             await self.bus.publish(Message(sender=self.name, topic="order_flow_cleared", payload=insight))
         else:
-            self.logger.error("Habilidade LiquidityHeatmapSkill não equipada!")
+            # GAP-F06 FIX: Sem LiquidityHeatmapSkill, faz pass-through em vez de morrer silenciosamente
+            self.logger.warning("LiquidityHeatmapSkill não equipada — forward direto para QuantumRisk.")
+            insight["tape_bias"] = "UNKNOWN"
+            await self.bus.publish(Message(sender=self.name, topic="order_flow_cleared", payload=insight))

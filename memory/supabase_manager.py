@@ -26,7 +26,7 @@ class SupabaseManager:
         if self.url and self.key and not self.key.endswith("(insira_a_sua_service_role_key_aqui)"):
             try:
                 self.client = create_client(self.url, self.key)
-                logger.info("✅ Conexão com Supabase Cloud estabelecida (Nexus Zenith V10.0 Schema).")
+                logger.info("✅ Conexão com Supabase Cloud estabelecida (Nexus Zenith V10.5 Schema).")
             except Exception as e:
                 logger.error(f"❌ Erro ao conectar com Supabase: {e}")
         else:
@@ -74,7 +74,7 @@ class SupabaseManager:
                 def _insert_pipeline():
                     self.client.table('pipeline_log').insert({
                         "pipeline_id": pipeline_id,
-                        "session_id": "nexus_singularity_v16.2",
+                        "session_id": "nexus_zenith_v10.5",
                         "ticker": asset,
                         "action": mapped_action,
                         "approved": approved,
@@ -85,12 +85,12 @@ class SupabaseManager:
                         "pattern": raw_data.get("fvg_type", "UNKNOWN"),
                         "quality_score": quality_score,
                         "stages_json": raw_data,
-                        "version": "10.0.0",
+                        "version": "10.5.0",
                         # V10.0 fields
                         "micro_trend": raw_data.get("micro_trend", "ALIGNED"),
                         "sweep_confirmed": raw_data.get("sweep_confirmed", False),
                         "vol_regime": raw_data.get("vol_regime", 1.0),
-                        "engine_version": "10.0"
+                        "engine_version": "10.5"
                     }).execute()
                 
                 await asyncio.to_thread(_insert_pipeline)
@@ -105,7 +105,13 @@ class SupabaseManager:
                 self.circuit_breaker.record_failure()
                 logger.error(f"\u274c Falha no Pipeline Log (Supabase): {e} | CB State: {self.circuit_breaker.state}")
 
-        asyncio.create_task(_run())
+        def _on_task_done(task):
+            """BUG-C03 FIX: Captura exceções de tasks fire-and-forget."""
+            if not task.cancelled() and task.exception():
+                logger.error(f"❌ Pipeline Log task falhou silenciosamente: {task.exception()}")
+
+        task = asyncio.create_task(_run())
+        task.add_done_callback(_on_task_done)
 
     async def _log_trade_journal_async(self, pipeline_id: str, asset: str, signal: str, confidence: float, mc_grade: str, raw_data: dict):
         """ Registra apenas as operações FÍSICAS EXECUTADAS no trade_journal (V8.4) """
@@ -122,13 +128,13 @@ class SupabaseManager:
                     "ticker": asset,
                     "action": self._map_action(signal),
                     "pattern": raw_data.get("fvg_type", "UNKNOWN"),
-                    "kill_zone": "NY_OPEN",
+                    "kill_zone": raw_data.get("kill_zone_status", "UNKNOWN"),
                     "committee_score": confidence,
                     "mc_grade": mc_grade,
                     "pipeline_id": pipeline_id,
                     "quality_score": raw_data.get("quality_score", 8.5),
                     "squeeze_release": raw_data.get("squeeze_release", False),
-                    "kill_zone_type": "NY_OPEN",
+                    "kill_zone_type": raw_data.get("kill_zone_status", "UNKNOWN"),
                     # V10.0 fields
                     "micro_trend": raw_data.get("micro_trend", "ALIGNED"),
                     "sweep_confirmed": raw_data.get("sweep_confirmed", False),

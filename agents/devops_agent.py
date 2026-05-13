@@ -20,8 +20,22 @@ class DevOpsWatchdogAgent(BaseAgent):
         # Escuta qualquer pedido de trade. Se o watchdog notar falha de infra, 
         # ele grita "action_rejected" e veta a ordem na hora.
         self.bus.subscribe("insight_generated", self)
+        # FIX: Escuta pedidos de flatten de emergência (EOD, DLL, etc.)
+        self.bus.subscribe("emergency_flatten", self)
 
     async def handle_message(self, message: Message):
+        # FIX: Handle emergency flatten from BrokerSync (EOD, DLL critical)
+        if message.topic == "emergency_flatten":
+            reason = message.payload.get("reason", "UNKNOWN")
+            self.logger.critical(f"🚨 EMERGENCY FLATTEN recebido: {reason}")
+            if "TradovateAPI" in self.skills:
+                try:
+                    flatten_result = await self.skills["TradovateAPI"].flatten_all()
+                    self.logger.critical(f"🚨 FLATTEN RESULT (EOD): {flatten_result}")
+                except Exception as e:
+                    self.logger.critical(f"🚨 FLATTEN FAILED: {e}")
+            return
+
         if "SystemKillSwitch" not in self.skills:
             return
 

@@ -1,7 +1,7 @@
 services:
   nexus_engine:
     build: .
-    container_name: nexus_engine_v16_2
+    container_name: nexus_engine_v10_5
     restart: unless-stopped
     env_file:
       - .env
@@ -22,7 +22,7 @@ services:
 
   nexus_dashboard:
     build: .
-    container_name: nexus_swarm_dashboard_v16_2
+    container_name: nexus_swarm_dashboard_v10_5
     restart: always
     volumes:
       - ./memory_data:/app/memory_data

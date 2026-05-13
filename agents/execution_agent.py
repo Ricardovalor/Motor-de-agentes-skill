@@ -61,18 +61,8 @@ class BrokerExecutionAgent(BaseAgent):
         asset = verdict.get("asset", "MNQ")
         signal = verdict.get("signal", "BUY")
         
-        # 1. Anti-hedging check
-        try:
-            has_position = await self.skills["TradovateAPI"].has_open_position(asset)
-            if has_position:
-                self.logger.error(f"🚫 ANTI-HEDGING: Posição já aberta em {asset}. Ordem REJEITADA.")
-                return {
-                    "execution_status": "REJECTED_ANTI_HEDGING",
-                    "asset": asset,
-                    "reason": f"Position already open in {asset}"
-                }
-        except Exception as e:
-            self.logger.warning(f"Anti-hedging check failed: {e}. Proceeding with caution.")
+        # TITAN-010 FIX: Anti-hedging check removido daqui — já é feito
+        # nativamente dentro do TradovateAPISkill.execute() (evita GET duplicado)
         
         # 2. Mapear ação
         action = "Buy" if signal in ("BUY", "LONG") else "Sell"
@@ -108,7 +98,13 @@ class BrokerExecutionAgent(BaseAgent):
         """
         Execução via CDP/DOM injection (modo legado).
         Injeta preços na boleta do TradingView/Tradovate via Chrome DevTools.
+        V16.2.1: Anti-bot delay humano (1-3s) para evitar detecção de automação.
         """
+        # Anti-bot: delay humano aleatório antes da injeção
+        delay = random.uniform(1.0, 3.0)
+        self.logger.info(f"⏱️ Anti-Bot Delay: {delay:.1f}s antes da injeção CDP...")
+        await asyncio.sleep(delay)
+        
         receipt = await self.skills["BrowserMCPExecution"].execute(trade_payload=verdict)
         
         if receipt.get("execution_status") == "SUCCESS_INJECTED":

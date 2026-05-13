@@ -33,7 +33,8 @@ class ForensicAgent(BaseAgent):
         if topic == "execute_action":
             status = "APPROVED_BY_COMMITTEE"
         elif topic == "action_rejected":
-            status = "REJECTED_BY_GUARDIAN"
+            # BUG-H05 FIX: Preserva o status real (MACRO, WATCHDOG, TAPE_READER, etc.)
+            status = payload.get("status", "REJECTED_BY_GUARDIAN")
         elif topic == "trade_receipt":
             status = "EXECUTED_IN_BROKER"
             asset = payload.get("trade_payload", {}).get("asset", "UNKNOWN")

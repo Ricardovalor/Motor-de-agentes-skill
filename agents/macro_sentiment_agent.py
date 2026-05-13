@@ -56,4 +56,9 @@ class MacroSentimentAgent(BaseAgent):
             # Se não há notícias, repassa a bola para o Oráculo fazer análise gráfica
             await self.bus.publish(Message(sender=self.name, topic="macro_context_ready", payload=market_data))
         else:
-            self.logger.error("Habilidade MacroNewsSkill não equipada!")
+            # GAP-F05 FIX: Sem MacroNewsSkill, faz pass-through em vez de morrer silenciosamente
+            self.logger.warning("MacroNewsSkill não equipada — forward direto para Oracle (sem filtro macro).")
+            market_data["macro_sentiment"] = "UNKNOWN"
+            market_data["news_headline"] = "N/A"
+            market_data["red_folder_imminent"] = False
+            await self.bus.publish(Message(sender=self.name, topic="macro_context_ready", payload=market_data))

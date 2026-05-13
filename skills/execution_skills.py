@@ -32,9 +32,12 @@ class TradingViewTradovateMCPExecutionSkill(BaseSkill):
         qty = trade_payload.get('qty', 1)
         
         # BUG-07 FIX: Per-asset parameters (MNQ vs MGC)
+        # TITAN-007 FIX: Adicionados MES e M6E (antes caíam no fallback MNQ errado)
         ASSET_PARAMS = {
             "MNQ": {"tick_size": 0.25, "tick_value": 0.50, "risk_ticks": 40},  # 10 pts SL = $20
             "MGC": {"tick_size": 0.10, "tick_value": 1.00, "risk_ticks": 30},  # 3 pts SL = $30
+            "MES": {"tick_size": 0.25, "tick_value": 1.25, "risk_ticks": 32},  # 8 pts SL = $40
+            "M6E": {"tick_size": 0.0001, "tick_value": 1.25, "risk_ticks": 40},  # 40 pips SL
         }
         params = ASSET_PARAMS.get(asset, ASSET_PARAMS["MNQ"])
         tick_size = trade_payload.get('tick_size', params["tick_size"])
@@ -43,11 +46,11 @@ class TradingViewTradovateMCPExecutionSkill(BaseSkill):
         if signal == "LONG" or signal == "BUY":
             sl_price = price - (risk_ticks * tick_size)
             tp_price = price + (risk_ticks * tick_size * rr_ratio)
-            btn_selectors = "[data-name='buy-button'], .tv-trading-buy-button, button.buy"
+            btn_selectors = "[data-name='buy-button'], .tv-trading-buy-button, button.buy, button[class*='buyButton'], button[class*='Buy'], .orderWidgetContent button.buy"
         else:
             sl_price = price + (risk_ticks * tick_size)
             tp_price = price - (risk_ticks * tick_size * rr_ratio)
-            btn_selectors = "[data-name='sell-button'], .tv-trading-sell-button, button.sell"
+            btn_selectors = "[data-name='sell-button'], .tv-trading-sell-button, button.sell, button[class*='sellButton'], button[class*='Sell'], .orderWidgetContent button.sell"
 
         # JS injetado remotamente na aba do TradingView via CDP WebSocket
         js_code = f"""
@@ -75,20 +78,20 @@ class TradingViewTradovateMCPExecutionSkill(BaseSkill):
             }}
             
             // 1. Configurar Quantidade
-            const qtyInput = findEl('[data-name="qty-input"], .js-order-ticket-qty, input[name="qty"]');
+            const qtyInput = findEl('[data-name="qty-input"], .js-order-ticket-qty, input[name="qty"], input[class*="qty"], input[class*="Qty"], .orderWidgetContent input[type="number"]');
             setInputValue(qtyInput, '{qty}');
 
             // 2. TP e SL
-            const tpToggle = findEl('[data-name="tp-checkbox"], .js-tp-toggle');
+            const tpToggle = findEl('[data-name="tp-checkbox"], .js-tp-toggle, input[class*="takeProfitCheckbox"], [data-name="take-profit-toggle"]');
             if(tpToggle && !tpToggle.checked) tpToggle.click();
             
-            const slToggle = findEl('[data-name="sl-checkbox"], .js-sl-toggle');
+            const slToggle = findEl('[data-name="sl-checkbox"], .js-sl-toggle, input[class*="stopLossCheckbox"], [data-name="stop-loss-toggle"]');
             if(slToggle && !slToggle.checked) slToggle.click();
             
-            const tpInput = findEl('[data-name="tp-input"], .js-tp-value, input[name="tp"]');
+            const tpInput = findEl('[data-name="tp-input"], .js-tp-value, input[name="tp"], input[class*="takeProfitInput"], [data-name="take-profit-price"] input');
             setInputValue(tpInput, '{tp_price}');
             
-            const slInput = findEl('[data-name="sl-input"], .js-sl-value, input[name="sl"]');
+            const slInput = findEl('[data-name="sl-input"], .js-sl-value, input[name="sl"], input[class*="stopLossInput"], [data-name="stop-loss-price"] input');
             setInputValue(slInput, '{sl_price}');
             
             // 3. Clicar no botão Comprar/Vender a Mercado

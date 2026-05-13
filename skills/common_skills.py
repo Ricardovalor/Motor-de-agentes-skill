@@ -25,9 +25,13 @@ class MathExecutionSkill(BaseSkill):
     async def execute(self, expression: str) -> float:
         self.logger.info(f"Calculando expressão complexa: {expression}")
         try:
-            # Em um sistema real rodaríamos via ast.literal_eval ou engine segura
-            result = eval(expression)
+            # BUG-C03 FIX: ast.literal_eval() — seguro contra injeção de código
+            import ast
+            result = ast.literal_eval(expression)
             return float(result)
+        except (ValueError, SyntaxError) as e:
+            self.logger.error(f"Expressão inválida ou insegura: {e}")
+            return 0.0
         except Exception as e:
             self.logger.error(f"Erro na matemática: {e}")
             return 0.0

@@ -118,7 +118,7 @@ class CrossAssetCorrelationSkill(BaseSkill):
     async def execute(self, asset_a: str = "MNQ", asset_b: str = "MGC", **kwargs) -> dict:
         self.logger.info(f"Calculando correlação Pearson real entre {asset_a} e {asset_b}...")
         
-        ticker_map = {"MNQ": "NQ=F", "MGC": "GC=F", "MES": "ES=F"}
+        ticker_map = {"MNQ": "NQ=F", "MGC": "GC=F", "MES": "ES=F", "M6E": "EURUSD=X"}
         yf_a = ticker_map.get(asset_a, asset_a)
         yf_b = ticker_map.get(asset_b, asset_b)
         

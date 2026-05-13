@@ -10,9 +10,10 @@ logger = logging.getLogger("ApexCompliance")
 
 # Caminhos possíveis para o rules.json (fonte única de verdade)
 _RULES_SEARCH_PATHS = [
+    os.path.join(os.path.dirname(__file__), "..", "rules.json"),  # Dentro do Motor (prioridade)
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "extratredey", "rules.json"),  # Dev local
-    r"e:\extratredey\rules.json",       # Windows path absoluto
-    os.path.join(os.path.dirname(__file__), "..", "rules.json"),  # Dentro do Motor
+    # GAP-M04 FIX: Path cross-platform em vez de hardcoded Windows
+    os.path.join(os.path.expanduser("~"), "extratredey", "rules.json"),
 ]
 
 
@@ -39,7 +40,8 @@ class ApexComplianceSkill(BaseSkill):
     Garante compliance estrito com as regras da Apex Trader Funding (EOD 50k).
     Monitora limite de perda diária (DLL) e Drawdown (Trailing).
     
-    V16.2: Carrega parâmetros do rules.json (fonte única de verdade compartilhada com Extratredey).
+    V16.2.1: Carrega parâmetros do rules.json + detecção automática de fase EVAL/PA
+    para aplicar limites corretos de contratos (6 mini EVAL vs 4 mini PA).
     """
     def __init__(self, db_path: str = "./memory_data/telemetry.db"):
         super().__init__(name="ApexComplianceSkill", description="Avaliação de Risco APEX EOD e Limites Diários.")
@@ -53,6 +55,39 @@ class ApexComplianceSkill(BaseSkill):
         self.account_size = rules.get("account_size", 50000)
         self.mandatory_stop_loss = rules.get("mandatory_stop_loss", True)
         self._rules_version = rules.get("_version", "fallback")
+        
+        # V10.1: Detecção de Fase (EVAL vs PA) e Modelo (EOD vs Legacy)
+        self.phase = os.environ.get("APEX_PHASE", rules.get("phase", "EVALUATION")).upper()
+        self.model_type = os.environ.get("APEX_MODEL", rules.get("model_type", "EOD")).upper()
+        
+        if self.phase == "PA":
+            if self.model_type == "LEGACY":
+                # Legacy PA: 30% consistency, fixed contracts, real-time trailing drawdown
+                legacy = rules.get("legacy_pa_rules", {})
+                self.consistency_rule_pct = legacy.get("consistency_rule_percent", 30)
+                self.max_contracts_mini = legacy.get("max_contracts_mini_50k", 10)
+                self.max_drawdown = -abs(legacy.get("max_drawdown", 2500))
+                self.scaling_tiers = None  # Legacy has NO scaling tiers
+                logger.info(f"⚖️ Fase PA LEGACY: {self.max_contracts_mini} contratos fixos, consistência {self.consistency_rule_pct}%, drawdown TRAILING REAL-TIME")
+            else:
+                # EOD PA: 50% consistency, scaling tiers, EOD trailing drawdown
+                pa_rules = rules.get("pa_rules", {})
+                self.consistency_rule_pct = pa_rules.get("consistency_rule_percent", 50)
+                # PA 50K Scaling Tiers (Apex Official TOS May 2026)
+                self.scaling_tiers = {
+                    1: {"profit_range": (0, 1499), "max_contracts": 2, "dll": 1000},
+                    2: {"profit_range": (1500, 2999), "max_contracts": 3, "dll": 1000},
+                    3: {"profit_range": (3000, 5999), "max_contracts": 4, "dll": 2000},
+                    4: {"profit_range": (6000, float('inf')), "max_contracts": 4, "dll": 3000},
+                }
+                self.max_contracts_mini = 2  # Start at Tier 1 (conservative)
+                logger.info(f"⚖️ Fase PA EOD: Tier Scaling ATIVO, consistência {self.consistency_rule_pct}%")
+        else:
+            eval_rules = rules.get("evaluation_rules", {})
+            self.max_contracts_mini = eval_rules.get("max_contracts_mini", 6)
+            self.consistency_rule_pct = 0  # Não se aplica na EVAL
+            self.scaling_tiers = None
+            logger.info(f"📋 Fase EVALUATION: max {self.max_contracts_mini} mini-contratos")
 
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -102,16 +137,19 @@ class ApexComplianceSkill(BaseSkill):
             is_compliant = False
             rejection_reason = f"Max Trades Diário Atingido ({self.max_trades_per_day})"
             
-        # Fim do Mock: Leitura de PnL Real via BrokerSyncSkill
+        # BUG-H04 FIX: Lê PnL real sem reinstanciar BrokerSyncSkill a cada chamada
+        current_daily_pnl = 0.0
         try:
-            from skills.broker_skills import BrokerSyncSkill
-            broker_sync = BrokerSyncSkill()
-            sync_result = await broker_sync.execute({})
-            current_daily_pnl = sync_result.get("current_daily_pnl", 0.0)
-            logger.info(f"PnL Flutuante Real Capturado da Corretora: ${current_daily_pnl}")
+            # Prioridade: live_pnl.json (atualizado pelo BrokerSyncAgent)
+            import json as _json
+            pnl_path = os.path.join(os.path.dirname(self.db_path), "live_pnl.json")
+            if os.path.exists(pnl_path):
+                with open(pnl_path, "r") as f:
+                    pnl_data = _json.load(f)
+                    current_daily_pnl = pnl_data.get("pnl", 0.0)
+                    logger.info(f"PnL Real lido de live_pnl.json: ${current_daily_pnl}")
         except Exception as e:
-            logger.error(f"Falha ao ler PnL real via CDP: {e}")
-            current_daily_pnl = 0.0 # Fail-safe
+            logger.warning(f"Falha ao ler PnL de live_pnl.json: {e}. Usando $0.0 (fail-safe).")
             
         if current_daily_pnl <= self.daily_loss_limit:
             is_compliant = False
