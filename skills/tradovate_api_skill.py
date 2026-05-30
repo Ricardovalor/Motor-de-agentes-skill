@@ -192,23 +192,23 @@ class TradovateAPISkill(BaseSkill):
         }
         
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        self.access_token = data.get("accessToken")
-                        # Token válido por 24h, renovamos a cada 12h
-                        self.token_expiry = time.time() + 43200  # 12h
-                        
-                        # Buscar account_id
-                        await self._fetch_account_info()
-                        
-                        logger.info(f"✅ Tradovate Auth OK | Account: {self.account_spec} (ID: {self.account_id}) | Mode: {self.mode.upper()}")
-                        return True
-                    else:
-                        error = await resp.text()
-                        logger.error(f"❌ Tradovate Auth FAILED ({resp.status}): {error}")
-                        return False
+            session = await self._get_session()
+            async with session.post(url, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    self.access_token = data.get("accessToken")
+                    # Token válido por 24h, renovamos a cada 12h
+                    self.token_expiry = time.time() + 43200  # 12h
+                    
+                    # Buscar account_id
+                    await self._fetch_account_info()
+                    
+                    logger.info(f"✅ Tradovate Auth OK | Account: {self.account_spec} (ID: {self.account_id}) | Mode: {self.mode.upper()}")
+                    return True
+                else:
+                    error = await resp.text()
+                    logger.error(f"❌ Tradovate Auth FAILED ({resp.status}): {error}")
+                    return False
         except Exception as e:
             logger.error(f"❌ Tradovate Auth Exception: {e}")
             return False
