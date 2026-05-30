@@ -5,6 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 import uvicorn
 import os
+import sys
+import io
+
+# TITAN-015 FIX: Força UTF-8 no stdout para evitar UnicodeEncodeError
+# no terminal Windows (cp1252 não suporta emojis)
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 app = FastAPI(title="Nexus Unified Dashboard")
 

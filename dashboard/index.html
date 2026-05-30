@@ -428,7 +428,7 @@
 
         async function fetchTelemetry() {
             try {
-                const response = await fetch('http://localhost:8000/api/telemetry');
+                const response = await fetch('/api/telemetry');
                 const result = await response.json();
                 if (result.status === 'success') updateDashboard(result.data);
             } catch (error) {
@@ -580,7 +580,7 @@
 
         async function fetchLivePnL() {
             try {
-                const response = await fetch('http://localhost:8000/api/pnl');
+                const response = await fetch('/api/pnl');
                 const pnlData = await response.json();
                 const pnl = pnlData.pnl || 0.0;
                 
