@@ -1,3 +1,4 @@
+import asyncio
 from core.base import BaseAgent
 from core.engine import Message
 from memory.memory_manager import VectorMemory, StateMemory
@@ -41,8 +42,9 @@ class ForensicAgent(BaseAgent):
             signal = payload.get("trade_payload", {}).get("signal", "UNKNOWN")
             confidence = payload.get("trade_payload", {}).get("confidence", 0.0)
 
-        # Salva em SQLite para dashboards clássicos
-        self.sql_db.log_execution(
+        # Salva em SQLite para dashboards clássicos - off-thread via asyncio.to_thread para não travar o Event Loop (TITAN-002 real fix)
+        await asyncio.to_thread(
+            self.sql_db.log_execution,
             asset=asset,
             signal=signal,
             confidence=confidence,

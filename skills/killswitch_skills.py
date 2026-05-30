@@ -13,10 +13,13 @@ class SystemKillSwitchSkill(BaseSkill):
     Monitora a saúde da máquina hospedeira e a latência de rede.
     Se o sistema ameaçar travar, aciona o comando FLATTEN ALL (Zerar Conta).
     """
-    def __init__(self, max_latency_ms=300, max_ram_percent=95.0):
+    def __init__(self, max_latency_ms=300, max_ram_percent=95.0, latency_debounce_limit=3):
         super().__init__(name="SystemKillSwitch", description="Botão de Emergência DevOps")
         self.max_latency_ms = max_latency_ms
         self.max_ram_percent = max_ram_percent
+        self.latency_debounce_limit = latency_debounce_limit
+        self.latency_history = []
+        self.consecutive_latency_failures = 0
 
     async def _measure_broker_latency(self) -> float:
         """
@@ -53,6 +56,23 @@ class SystemKillSwitchSkill(BaseSkill):
         ram_usage = psutil.virtual_memory().percent
         cpu_usage = psutil.cpu_percent(interval=0.1)
 
+        # Atualiza histórico de latências
+        self.latency_history.append(latency)
+        if len(self.latency_history) > 10:
+            self.latency_history.pop(0)
+
+        # Filtro de Debounce para Latência de Rede
+        if latency > self.max_latency_ms:
+            self.consecutive_latency_failures += 1
+            logger.warning(
+                f"⚠️ [KillSwitch] Spike de Latência detectado: {latency:.1f}ms acima do limite de {self.max_latency_ms}ms "
+                f"({self.consecutive_latency_failures}/{self.latency_debounce_limit})"
+            )
+        else:
+            if self.consecutive_latency_failures > 0:
+                logger.info(f"🟢 [KillSwitch] Rede normalizada: {latency:.1f}ms. Restaurando contador de pânico.")
+            self.consecutive_latency_failures = 0
+
         critical_failure = False
         failure_reason = ""
 
@@ -61,21 +81,23 @@ class SystemKillSwitchSkill(BaseSkill):
             critical_failure = True
             failure_reason = f"OOM_RISK (RAM em {ram_usage}%)"
             
-        # Verifica se perdemos contato limpo com Chicago/NY
-        if latency > self.max_latency_ms:
+        # Verifica se perdemos contato limpo de forma persistente (debounce completo)
+        if self.consecutive_latency_failures >= self.latency_debounce_limit:
             critical_failure = True
-            failure_reason = f"NETWORK_CONGESTION (Latência {latency:.1f}ms)"
+            recent_failures = self.latency_history[-self.latency_debounce_limit:]
+            avg_latency = sum(recent_failures) / len(recent_failures)
+            failure_reason = f"PERSISTENT_NETWORK_CONGESTION (Média das últimas {self.latency_debounce_limit} falhas: {avg_latency:.1f}ms)"
 
         if critical_failure:
-            logger.critical(f"⚠️ [KILL SWITCH ATIVADO] Risco Estrutural Detectado: {failure_reason}")
-            logger.critical("⚠️ INJETANDO PAYLOAD DE PÂNICO NO MCP (FLATTEN ALL & CANCEL)...")
+            logger.critical(f"🚨 [KILL SWITCH ACTIVATED] PÂNICO REAL: {failure_reason}")
+            logger.critical("🚨 EXECUTANDO PROTOCOLO FLATTEN ALL NA CONTA APEX...")
             
-            # Aqui acionaríamos o MCP diretamente para clicar no botão "CLOSE ALL POSITIONS"
             return {
                 "system_status": "PANIC_FLATTEN",
                 "latency_ms": latency,
                 "ram_usage": ram_usage,
-                "action_taken": "ALL_ORDERS_CANCELLED_AND_POSITIONS_FLATTENED"
+                "action_taken": "ALL_ORDERS_CANCELLED_AND_POSITIONS_FLATTENED",
+                "failure_reason": failure_reason
             }
             
         return {

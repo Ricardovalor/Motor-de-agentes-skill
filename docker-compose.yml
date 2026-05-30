@@ -17,6 +17,7 @@ services:
       - ./rules.json:/app/rules.json
     ports:
       - "8005:8005"
+      - "8100:8100"
     networks:
       - nexus_net
 

@@ -51,21 +51,53 @@ class TradovateAPISkill(BaseSkill):
     # Fallback: calcula automaticamente baseado na data atual
     @staticmethod
     def _current_contract_suffix() -> str:
-        """Calcula sufixo do contrato ativo baseado no mês atual (CME quarterly)."""
+        """
+        Calcula sufixo do contrato ativo baseado no calendário de rollover da CME.
+        Índices futuros (CME Equity Index) realizam rollover na segunda quinta-feira
+        do mês de vencimento (Março, Junho, Setembro, Dezembro).
+        """
         import datetime
         now = datetime.datetime.now()
+        year = now.year
         month = now.month
-        year = str(now.year)[-1]  # Último dígito do ano
-        # CME months: H=Mar, M=Jun, U=Sep, Z=Dec
-        # O contrato ativo muda ~2 semanas antes do vencimento
-        if month <= 3:
-            return f"H{year}"
-        elif month <= 6:
-            return f"M{year}"
-        elif month <= 9:
-            return f"U{year}"
+        
+        # Mapeamento padrão dos meses de vencimento
+        # CME: H=Mar (3), M=Jun (6), U=Sep (9), Z=Dec (12)
+        vencimentos = {3: "H", 6: "M", 9: "U", 12: "Z"}
+        proximos = {3: (6, 0), 6: (9, 0), 9: (12, 0), 12: (3, 1)} # (mes, delta_ano)
+        
+        def get_second_thursday(y, m):
+            thursdays = []
+            for day in range(1, 15):
+                d = datetime.date(y, m, day)
+                if d.weekday() == 3: # 3 = Thursday
+                    thursdays.append(d)
+            return thursdays[1]
+            
+        # Determina o sufixo ativo
+        if month in vencimentos:
+            second_thursday = get_second_thursday(year, month)
+            if now.date() >= second_thursday:
+                # Já passamos do dia de rollover, usa o próximo contrato
+                prox_mes, delta_ano = proximos[month]
+                sufixo = vencimentos[prox_mes]
+                ano_sufixo = str(year + delta_ano)[-1]
+            else:
+                # Ainda no contrato atual
+                sufixo = vencimentos[month]
+                ano_sufixo = str(year)[-1]
         else:
-            return f"Z{year}"
+            # Não é mês de vencimento, determina por faixas fixas
+            if month in [1, 2]:
+                sufixo, ano_sufixo = "H", str(year)[-1]
+            elif month in [4, 5]:
+                sufixo, ano_sufixo = "M", str(year)[-1]
+            elif month in [7, 8]:
+                sufixo, ano_sufixo = "U", str(year)[-1]
+            else: # 10, 11
+                sufixo, ano_sufixo = "Z", str(year)[-1]
+                
+        return f"{sufixo}{ano_sufixo}"
     
     @property
     def SYMBOL_MAP(self) -> dict:
@@ -319,6 +351,55 @@ class TradovateAPISkill(BaseSkill):
         return result
 
     # =====================================================================
+    # MODIFY ORDER (Trailing Stop Support)
+    # =====================================================================
+
+    async def get_working_orders(self) -> List[Dict]:
+        """
+        Retorna as ordens pendentes (Working/Accepted).
+        Utilizado para encontrar o Stop Loss (bracket1) e arrastá-lo.
+        """
+        if not await self.authenticate():
+            return []
+            
+        orders = await self._api_get("/order/list")
+        if not orders:
+            return []
+            
+        return [o for o in orders if o.get("ordStatus") in ("Working", "Accepted")]
+
+    async def modify_order(self, order_id: int, order_qty: int, order_type: str, new_price: float, is_stop: bool = True) -> Dict[str, Any]:
+        """
+        Modifica uma ordem existente.
+        - Se is_stop=True, modifica 'stopPrice' (ex: trailing stop).
+        - Se is_stop=False, modifica 'price' (ex: take profit).
+        """
+        if not await self.authenticate():
+            return {"error": True, "detail": "Auth failed"}
+            
+        payload = {
+            "orderId": order_id,
+            "orderQty": order_qty,
+            "orderType": order_type,
+            "isAutomated": True
+        }
+        
+        if is_stop:
+            payload["stopPrice"] = round(new_price, 2)
+        else:
+            payload["price"] = round(new_price, 2)
+            
+        logger.info(f"🔄 Modificando ordem {order_id} → Novo Preço: {new_price} (is_stop={is_stop})")
+        result = await self._api_post("/order/modifyorder", payload)
+        
+        if result and not result.get("error"):
+            logger.info(f"✅ Ordem {order_id} modificada com sucesso.")
+        else:
+            logger.error(f"❌ Falha ao modificar ordem {order_id}: {result}")
+            
+        return result
+
+    # =====================================================================
     # KILL SWITCH: FLATTEN ALL
     # =====================================================================
     
@@ -414,6 +495,28 @@ class TradovateAPISkill(BaseSkill):
         positions = await self.get_open_positions()
         tv_symbol = self.SYMBOL_MAP.get(symbol, symbol)
         return any(tv_symbol in str(p.get("symbol", "")) for p in positions)
+
+    async def get_open_pnl(self) -> float:
+        """
+        Retorna o PnL não realizado (flutuante) atual da conta via API.
+        Usa o endpoint /position/list ou /cashBalance/getcashbalancesnapshot.
+        """
+        if not await self.authenticate():
+            return 0.0
+
+        # Primeiramente, tenta via position/list
+        positions = await self._api_get("/position/list")
+        if not positions:
+            return 0.0
+
+        total_pnl = 0.0
+        for pos in positions:
+            # Tradovate tipicamente expõe realizedPnL e unrealizedPnL, ou no mínimo netPrice / openPrice.
+            # O campo exato depende da sua schema, usualmente 'unrealizedPnL' ou calculando MTM.
+            unrealized = pos.get("unrealizedPnL", 0.0)
+            total_pnl += unrealized
+
+        return total_pnl
 
     # =====================================================================
     # MAIN EXECUTE (BaseSkill interface)

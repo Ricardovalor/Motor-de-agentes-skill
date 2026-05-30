@@ -31,15 +31,14 @@ class EventBus:
 
     async def publish(self, message: Message):
         """
-        V16.2 FIX: Sequential dispatch — subscribers are processed IN ORDER.
-        This prevents race conditions where ExecutionAgent fires before Guardian validates.
-        
-        TITAN-001 FIX: Se a fila estiver cheia (backpressure), descarta a mensagem
-        mais antiga para evitar memory leak em sessões longas.
+        TITAN-001 REAL FIX: Despacho concorrente real via asyncio.gather.
+        Permite que múltiplos assinantes do mesmo tópico processem eventos simultaneamente,
+        eliminando latência em cadeia e impedindo que tarefas secundárias (como auditoria forense)
+        atrasem a execução física da ordem (Broker-Execution).
         """
         if message.topic in self._subscribers:
-            for agent in self._subscribers[message.topic]:
-                await self._safe_handle(agent, message)
+            tasks = [self._safe_handle(agent, message) for agent in self._subscribers[message.topic]]
+            await asyncio.gather(*tasks)
 
     async def _safe_handle(self, agent, message):
         try:

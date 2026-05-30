@@ -7,6 +7,13 @@ from ta.trend import EMAIndicator
 import time
 import json
 import sqlite3
+import sys
+import io
+
+# TITAN-015 FIX: Força UTF-8 no stdout para evitar UnicodeEncodeError
+# no terminal Windows (cp1252 não suporta emojis)
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 🦅 NEXUS ZENITH V16.2 - QUANTUM HISTORICAL BACKTEST SCRIPT
@@ -32,15 +39,16 @@ async def send_signal(session, asset, signal, price, timestamp, fvg_type):
     for port in [8000, 8005]:
         url = f"http://127.0.0.1:{port}/webhook/tradingview"
         try:
-            async with session.post(url, json=payload, timeout=3) as response:
+            async with session.post(url, json=payload, timeout=30) as response:
                 result = await response.text()
                 if response.status == 200:
                     print(f"[{timestamp}] 📤 Injeção enviada na porta {port}: {signal} @ {price:.2f} -> Motor Retornou OK")
                     return True
-        except Exception:
+        except Exception as e:
+            print(f"[{timestamp}] ⚠️ Erro na porta {port}: {type(e).__name__} - {e}")
             continue
             
-    print(f"[{timestamp}] ❌ Motor Offline nas portas 8000 e 8005. Certifique-se que o Nexus ou o Docker está rodando!")
+    print(f"[{timestamp}] ❌ Falha na conexão com o motor em ambas as portas (8000/8005).")
     return False
 
 async def run_backtest():

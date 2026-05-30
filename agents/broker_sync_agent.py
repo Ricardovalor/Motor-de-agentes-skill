@@ -57,7 +57,9 @@ class BrokerSyncAgent(BaseAgent):
         try:
             rules_paths = [
                 os.path.join(os.path.dirname(__file__), "..", "rules.json"),
-                # GAP-M04 FIX: Path relativo cross-platform em vez de hardcoded Windows
+                # TITAN-021 FIX: Path explícito absoluto para a base de regras (evitando falhas em E:)
+                r"e:\extratredey\rules.json",
+                # Fallback antigo mantido por precaução
                 os.path.join(os.path.expanduser("~"), "extratredey", "rules.json"),
             ]
             rules = {}
@@ -85,8 +87,20 @@ class BrokerSyncAgent(BaseAgent):
         while not self._should_stop:
             try:
                 # === PNL SYNC ===
-                pnl_res = await self.sync_skill.execute({})
-                pnl = pnl_res.get("current_daily_pnl", 0.0)
+                # TITAN-023 FIX: Tenta via REST API primeiro
+                tradovate_skill = self.skills.get("TradovateAPI")
+                pnl = None
+                
+                if tradovate_skill:
+                    try:
+                        pnl = await tradovate_skill.get_open_pnl()
+                    except Exception as e:
+                        self.logger.error(f"Erro ao obter PnL via API: {e}")
+                
+                if pnl is None:
+                    # Fallback para o CDP SyncSkill
+                    pnl_res = await self.sync_skill.execute({})
+                    pnl = pnl_res.get("current_daily_pnl", 0.0)
                 
                 # Só escreve no disco se o PnL realmente mudou (evita I/O desnecessário)
                 if pnl != self._last_written_pnl:
@@ -113,7 +127,26 @@ class BrokerSyncAgent(BaseAgent):
                             "TITAN-006: Entry price não disponível para trailing. "
                             "Usando 0 (breakeven genérico CDP)."
                         )
-                    await self.trailing_skill.execute({"new_sl_price": breakeven_price})
+                    # TITAN-022 FIX: Tenta via REST API primeiro (Institucional DMA)
+                    tradovate_skill = self.skills.get("TradovateAPI")
+                    if tradovate_skill and self._active_entry_price > 0:
+                        try:
+                            working_orders = await tradovate_skill.get_working_orders()
+                            stop_orders = [o for o in working_orders if o.get("orderType") == "Stop"]
+                            if stop_orders:
+                                for stop_order in stop_orders:
+                                    order_id = stop_order.get("id")
+                                    order_qty = stop_order.get("orderQty", 1)
+                                    order_type = stop_order.get("orderType", "Stop")
+                                    await tradovate_skill.modify_order(order_id, order_qty, order_type, float(breakeven_price), is_stop=True)
+                                self.logger.info("API Trailing Stop executado via Tradovate REST API.")
+                            else:
+                                self.logger.warning("Nenhuma ordem Stop encontrada para Trailing via API.")
+                        except Exception as e:
+                            self.logger.error(f"Erro no Trailing Stop API: {e}")
+                    else:
+                        # Fallback legacy CDP
+                        await self.trailing_skill.execute({"new_sl_price": breakeven_price})
                 elif pnl < -(dll_limit * 0.7):
                     self.logger.warning(f"⚠️ DLL DANGER ZONE: PnL=${pnl:.2f} | DLL Limit=${dll_limit}")
                 

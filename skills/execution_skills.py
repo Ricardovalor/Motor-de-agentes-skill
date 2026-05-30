@@ -3,6 +3,7 @@ import aiohttp
 import json
 import logging
 import time
+import os
 from core.base import BaseSkill
 
 class TradingViewTradovateMCPExecutionSkill(BaseSkill):
@@ -14,10 +15,35 @@ class TradingViewTradovateMCPExecutionSkill(BaseSkill):
     Acessa a porta 9222 do Chrome para encontrar a aba do TradingView, e injeta
     o comando de compra/venda diretamente no painel de negociação nativo (Tradovate).
     """
-    def __init__(self, cdp_host="host.docker.internal", cdp_port=9222):
+    def __init__(self, cdp_host=None, cdp_port=None):
         super().__init__(name="BrowserMCPExecution")
-        self.cdp_host = cdp_host
-        self.cdp_port = cdp_port
+        
+        # Resolução Dinâmica Híbrida do Host CDP
+        env_host = os.getenv("CDP_HOST")
+        if env_host:
+            self.cdp_host = env_host
+        elif cdp_host:
+            self.cdp_host = cdp_host
+        else:
+            # Detecta se está em container Docker
+            if os.path.exists("/.dockerenv") or os.getenv("DOCKER_CONTAINER") == "true":
+                self.cdp_host = "host.docker.internal"
+            else:
+                self.cdp_host = "127.0.0.1"
+                
+        # Resolução Dinâmica Híbrida da Porta CDP
+        env_port = os.getenv("CDP_PORT")
+        if env_port:
+            try:
+                self.cdp_port = int(env_port)
+            except ValueError:
+                self.cdp_port = 9222
+        elif cdp_port:
+            self.cdp_port = cdp_port
+        else:
+            self.cdp_port = 9222
+            
+        self.logger.info(f"[BrowserMCP] Host de depuração do Chrome resolvido para: {self.cdp_host}:{self.cdp_port}")
 
     def _generate_tv_dom_payload(self, trade_payload: dict) -> str:
         """

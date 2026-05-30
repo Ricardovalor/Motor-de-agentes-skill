@@ -115,16 +115,33 @@ class ApexComplianceSkill(BaseSkill):
         if pnl_source == "UNKNOWN":
             try:
                 if os.path.exists(self.db_path):
-                    conn = sqlite3.connect(self.db_path)
+                    import pytz
+                    from datetime import timedelta
+                    
+                    ny_tz = pytz.timezone("America/New_York")
+                    now_ny = datetime.now(ny_tz)
+                    
+                    # Se a hora atual de NY for menor que 17:00, a sessão iniciou ontem às 17:00 NY
+                    if now_ny.hour < 17:
+                        session_start = now_ny.replace(hour=17, minute=0, second=0, microsecond=0) - timedelta(days=1)
+                    else:
+                        session_start = now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
+                        
+                    # Converte o início da sessão de NY para UTC (formato usado pelo SQLite CURRENT_TIMESTAMP)
+                    session_start_utc = session_start.astimezone(timezone.utc)
+                    session_start_str = session_start_utc.strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # Conexão com timeout robusto para evitar locks
+                    conn = sqlite3.connect(self.db_path, timeout=30.0)
                     cursor = conn.cursor()
-                    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
                     cursor.execute(
-                        "SELECT COUNT(*) FROM telemetry WHERE timestamp LIKE ? AND status IN ('APPROVED_BY_COMMITTEE', 'EXECUTED_IN_BROKER')",
-                        (f"{today}%",)
+                        "SELECT COUNT(*) FROM telemetry WHERE timestamp >= ? AND status IN ('APPROVED_BY_COMMITTEE', 'EXECUTED_IN_BROKER')",
+                        (session_start_str,)
                     )
                     trades_hoje = cursor.fetchone()[0]
                     conn.close()
                     pnl_source = "SQLITE_LOCAL"
+                    logger.info(f"[Compliance] Sessão Apex iniciada em (NY): {session_start.strftime('%Y-%m-%d %H:%M:%S')} | UTC: {session_start_str} | Trades detectados hoje: {trades_hoje}")
             except Exception as e:
                 logger.warning(f"Erro ao ler telemetry.db para Compliance APEX: {e}")
 

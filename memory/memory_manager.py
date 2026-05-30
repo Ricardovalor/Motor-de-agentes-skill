@@ -101,8 +101,9 @@ class StateMemory:
     def _init_db(self):
         try:
             os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
-            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30.0)
             cursor = self._conn.cursor()
+            cursor.execute('PRAGMA journal_mode=WAL;')
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS telemetry (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,7 +116,7 @@ class StateMemory:
                 )
             ''')
             self._conn.commit()
-            logger.info(f"StateMemory (SQLite) inicializado em {self.db_path}")
+            logger.info(f"StateMemory (SQLite) inicializado em WAL mode em {self.db_path}")
         except Exception as e:
             logger.error(f"Erro ao inicializar DB Relacional: {e}")
 

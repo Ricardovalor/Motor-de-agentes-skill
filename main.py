@@ -64,13 +64,18 @@ async def receive_tradingview_signal(request: Request):
         logging.info(f"[WEBHOOK] Sinal recebido do TradingView: {asset} | {signal} @ {price}")
 
         if _engine_ref and _engine_ref.bus:
+            # TITAN-020 FIX: Master-Slave bypass. Se o FastAPI já aprovou o trade
+            # no seu pipeline completo (Orchestrator, L2 DOM, MC), ele envia force_execute=True.
+            # O Motor Docker apenas executa a ordem (via BrokerExecutionAgent) sem re-avaliar.
+            topic_to_publish = "execute_action" if payload.get("force_execute") else "data_request"
+            
             await _engine_ref.bus.publish(Message(
                 sender="Webhook-TradingView",
-                topic="data_request",
+                topic=topic_to_publish,
                 payload=payload
             ))
             return JSONResponse(
-                content={"status": "OK", "message": f"Sinal {signal} para {asset} injetado no pipeline."},
+                content={"status": "OK", "message": f"Sinal {signal} para {asset} injetado no pipeline (tópico: {topic_to_publish})."},
                 status_code=200
             )
         else:
@@ -182,6 +187,7 @@ async def main():
     quantum.equip_skill(correlation_skill)
     broker.equip_skill(execution_mcp)
     broker.equip_skill(tradovate_api_skill)  # Fase 2: Dual mode execution
+    broker_sync.equip_skill(tradovate_api_skill) # Fase 2: API mode trailing stop
 
     # 4. Acopla o Enxame ao Motor (BUG-C01 FIX: broker_sync agora incluído!)
     for agent in [data_ops, macro, temporal, oracle, devops, tape_reader, quantum, guardian, committee, broker, forensic, broker_sync]:
