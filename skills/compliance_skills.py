@@ -115,17 +115,44 @@ class ApexComplianceSkill(BaseSkill):
         if pnl_source == "UNKNOWN":
             try:
                 if os.path.exists(self.db_path):
-                    import pytz
                     from datetime import timedelta
                     
-                    ny_tz = pytz.timezone("America/New_York")
+                    # Resolvedor de Timezone Híbrido e Resiliente (Self-Healing)
+                    ny_tz = None
+                    try:
+                        from zoneinfo import ZoneInfo
+                        ny_tz = ZoneInfo("America/New_York")
+                    except ImportError:
+                        try:
+                            import pytz
+                            ny_tz = pytz.timezone("America/New_York")
+                        except ImportError:
+                            # Fallback nativo: calcula se está no Horário de Verão dos EUA (EDT = UTC-4, caso contrário EST = UTC-5)
+                            # O horário de verão dos EUA inicia no 2º domingo de março e termina no 1º domingo de novembro
+                            from datetime import timezone as datetime_timezone
+                            now_utc = datetime.now(timezone.utc)
+                            # Aproximação robusta: Março a Novembro como EDT (UTC-4), outros meses como EST (UTC-5)
+                            if 3 <= now_utc.month <= 11:
+                                ny_tz = datetime_timezone(timedelta(hours=-4))
+                                logger.debug("TimeZone Fallback: Usando offset EDT (UTC-4)")
+                            else:
+                                ny_tz = datetime_timezone(timedelta(hours=-5))
+                                logger.debug("TimeZone Fallback: Usando offset EST (UTC-5)")
+                    
                     now_ny = datetime.now(ny_tz)
                     
                     # Se a hora atual de NY for menor que 17:00, a sessão iniciou ontem às 17:00 NY
-                    if now_ny.hour < 17:
+                    if hasattr(now_ny, "hour") and now_ny.hour < 17:
                         session_start = now_ny.replace(hour=17, minute=0, second=0, microsecond=0) - timedelta(days=1)
-                    else:
+                    elif hasattr(now_ny, "hour"):
                         session_start = now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
+                    else:
+                        # Para objetos timezone nativos sem datetime enriquecido completo (offset fixo de fallback)
+                        # datetime.now(tz) retorna um datetime normal
+                        if now_ny.hour < 17:
+                            session_start = now_ny.replace(hour=17, minute=0, second=0, microsecond=0) - timedelta(days=1)
+                        else:
+                            session_start = now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
                         
                     # Converte o início da sessão de NY para UTC (formato usado pelo SQLite CURRENT_TIMESTAMP)
                     session_start_utc = session_start.astimezone(timezone.utc)

@@ -21,29 +21,35 @@ class SystemKillSwitchSkill(BaseSkill):
         self.latency_history = []
         self.consecutive_latency_failures = 0
 
+    def _connect_tcp(self, host: str, port: int) -> float:
+        """Helper síncrono para conexão TCP executado em thread pool."""
+        import socket
+        start_time = time.time()
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1.0)
+            sock.connect((host, port))
+            sock.close()
+            return (time.time() - start_time) * 1000
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            return float('inf')
+
     async def _measure_broker_latency(self) -> float:
         """
-        Mede latência real via TCP connect ao WebSocket do Tradovate.
-        Fallback para loopback se rede externa falhar.
+        Mede latência real via TCP connect de forma concorrente em paralelo.
+        Executa os sockets off-thread via asyncio.to_thread para evitar qualquer micro-bloqueio.
         """
-        import socket
         targets = [
             ("live.tradovate.com", 443),      # Tradovate Live WS
             ("md.tradovate.com", 443),         # Tradovate Market Data
             ("127.0.0.1", 9222),               # CDP local (TradingView)
         ]
-        best_latency = float('inf')
-        for host, port in targets:
-            try:
-                start_time = time.time()
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(1.0)
-                sock.connect((host, port))
-                sock.close()
-                latency = (time.time() - start_time) * 1000
-                best_latency = min(best_latency, latency)
-            except (socket.timeout, ConnectionRefusedError, OSError):
-                continue
+        
+        # Dispara todas as medições em paralelo off-thread
+        tasks = [asyncio.to_thread(self._connect_tcp, host, port) for host, port in targets]
+        latencies = await asyncio.gather(*tasks)
+        
+        best_latency = min(latencies)
         
         if best_latency == float('inf'):
             logger.warning("[KillSwitch] Nenhum endpoint acessível — assumindo latência crítica")
