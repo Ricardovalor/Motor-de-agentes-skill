@@ -132,30 +132,29 @@ class TradingViewTradovateMCPExecutionSkill(BaseSkill):
         """
         return js_code
 
-    async def _inject_js_payload(self, ws_url: str, js_code: str) -> dict:
+    async def _inject_js_payload(self, session: aiohttp.ClientSession, ws_url: str, js_code: str) -> dict:
         """Envia o payload via WebSocket CDP real para injeção na aba do Chrome."""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(ws_url, timeout=3.0) as ws:
-                    # O CDP precisa de idenas sequenciais
-                    msg = {
-                        "id": 1,
-                        "method": "Runtime.evaluate",
-                        "params": {
-                            "expression": js_code,
-                            "returnByValue": True
-                        }
+            async with session.ws_connect(ws_url, timeout=3.0) as ws:
+                # O CDP precisa de idenas sequenciais
+                msg = {
+                    "id": 1,
+                    "method": "Runtime.evaluate",
+                    "params": {
+                        "expression": js_code,
+                        "returnByValue": True
                     }
-                    await ws.send_json(msg)
-                    response = await ws.receive_json()
-                    
-                    if "result" in response and "result" in response["result"]:
-                        exec_result = response["result"]["result"].get("value")
-                        self.logger.info(f"[CDP] Resposta do Node (Tradovate): {exec_result}")
-                        return {"status": "SUCCESS", "cdp_response": exec_result}
-                    else:
-                        self.logger.warning(f"[CDP] Erro na injeção DOM: {response}")
-                        return {"status": "FAILED", "cdp_response": response}
+                }
+                await ws.send_json(msg)
+                response = await ws.receive_json()
+                
+                if "result" in response and "result" in response["result"]:
+                    exec_result = response["result"]["result"].get("value")
+                    self.logger.info(f"[CDP] Resposta do Node (Tradovate): {exec_result}")
+                    return {"status": "SUCCESS", "cdp_response": exec_result}
+                else:
+                    self.logger.warning(f"[CDP] Erro na injeção DOM: {response}")
+                    return {"status": "FAILED", "cdp_response": response}
         except Exception as e:
             self.logger.error(f"[CDP] Falha na conexão WebSocket: {e}")
             return {"status": "ERROR", "error": str(e)}
@@ -180,7 +179,8 @@ class TradingViewTradovateMCPExecutionSkill(BaseSkill):
                             js_payload = self._generate_tv_dom_payload(trade_payload)
                             
                             self.logger.info(f"[CDP] Disparando Payload JS para o painel TradingView->Tradovate!")
-                            injection_result = await self._inject_js_payload(ws_url, js_payload)
+                            # TITAN-008: Passa a sessão aiohttp aquecida para reutilização
+                            injection_result = await self._inject_js_payload(session, ws_url, js_payload)
                             if injection_result["status"] == "SUCCESS":
                                 exec_status = "SUCCESS_INJECTED"
                             else:
